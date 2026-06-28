@@ -2050,8 +2050,8 @@ function render(){
   footer.style.display = S.screen==='landing' ? 'block' : 'none'
   // transição de tela
   main.classList.remove('page-anim'); void main.offsetWidth; main.classList.add('page-anim')
-  // (re)inicia a camada de movimento após o novo DOM
-  requestAnimationFrame(initMotion)
+  // (re)inicia a camada de movimento — síncrono p/ evitar flash de 1 frame
+  initMotion()
 }
 
 // ═══════════ MOTION LAYER ═══════════
