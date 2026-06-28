@@ -12,10 +12,15 @@
   --z950:#09090B;--z900:#18181B;--z800:#27272A;--z700:#3F3F46;--z600:#52525B;
   --z500:#71717A;--z400:#A1A1AA;--z300:#D4D4D8;--z200:#E4E4E7;--z100:#F4F4F5;--z50:#FAFAFA;
   --white:#fff;--green:#10B981;--green1:#D1FAE5;--red:#E63946;--red1:#FECDD3;--blue:#3B82F6;--blue1:#DBEAFE;
+  /* Superfícies premium escuras (grafite atlético) */
+  --ink:#0B0C0F;--ink2:#101216;--ink3:#16181E;--ink4:#1D2026;
+  --hair:rgba(255,255,255,.08);--hair2:rgba(255,255,255,.13);
+  --on-dark:rgba(255,255,255,.92);--on-dark-2:rgba(255,255,255,.56);--on-dark-3:rgba(255,255,255,.36);
   --r:0.75rem;--rl:1.25rem;--rxl:1.75rem;--r2xl:2.5rem;--rfull:9999px;
   --s:0 4px 12px rgba(9,9,11,.1),0 2px 4px rgba(9,9,11,.06);
-  --sl:0 16px 40px rgba(9,9,11,.14),0 8px 16px rgba(9,9,11,.08);
-  --so:0 8px 24px rgba(230,57,70,.3);
+  --sl:0 20px 50px rgba(9,9,11,.16),0 8px 18px rgba(9,9,11,.09);
+  --sd:0 24px 60px rgba(0,0,0,.5),0 8px 20px rgba(0,0,0,.35);
+  --so:0 10px 30px rgba(230,57,70,.32);
 }
 *,*::before,*::after{box-sizing:border-box;margin:0;padding:0}
 html{scroll-behavior:smooth}
@@ -71,16 +76,21 @@ select.input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xml
 .divider{height:1px;background:var(--z200)}
 
 /* NAV */
-#nav{position:sticky;top:0;z-index:100;background:var(--white);border-bottom:1px solid var(--z200)}
-.nav-in{max-width:1200px;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:68px}
+#nav{position:sticky;top:0;z-index:100;background:rgba(11,12,15,.82);backdrop-filter:saturate(180%) blur(16px);-webkit-backdrop-filter:saturate(180%) blur(16px);border-bottom:1px solid var(--hair)}
+.nav-in{max-width:1200px;margin:0 auto;padding:0 24px;display:flex;align-items:center;justify-content:space-between;height:70px}
 .logo{display:flex;align-items:center;gap:10px;cursor:pointer}
-.logo-icon{width:36px;height:36px;background:var(--orange);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:1.05rem;flex-shrink:0}
-.logo-txt{font-size:1.05rem;font-weight:800;letter-spacing:-.02em}
+.logo-icon{width:36px;height:36px;background:var(--orange);border-radius:10px;display:flex;align-items:center;justify-content:center;color:#fff;font-weight:900;font-size:1.05rem;flex-shrink:0;box-shadow:0 4px 14px rgba(230,57,70,.4)}
+.logo-txt{font-size:1.05rem;font-weight:800;letter-spacing:-.02em;color:#fff}
 .logo-txt span{color:var(--orange)}
 .nav-links{display:flex;align-items:center;gap:4px}
-.nav-links a{padding:8px 14px;border-radius:var(--r);font-size:.88rem;font-weight:600;color:var(--z600);cursor:pointer;transition:all .15s}
-.nav-links a:hover{color:var(--z950);background:var(--z100)}
+.nav-links a{padding:8px 14px;border-radius:var(--r);font-size:.88rem;font-weight:600;color:var(--on-dark-2);cursor:pointer;transition:all .15s}
+.nav-links a:hover{color:#fff;background:var(--hair)}
 .nav-actions{display:flex;align-items:center;gap:10px}
+/* Botões adaptados ao nav escuro */
+#nav .btn-ghost{color:var(--on-dark-2)}
+#nav .btn-ghost:hover{color:#fff;background:var(--hair)}
+#nav .btn-outline{color:#fff;border-color:var(--hair2);background:transparent}
+#nav .btn-outline:hover{background:var(--hair);border-color:rgba(255,255,255,.25)}
 
 /* HERO PREMIUM */
 .hero{background:#0F1117;min-height:100dvh;display:flex;flex-direction:column;justify-content:center;overflow:hidden;position:relative;padding:100px 0 80px}
@@ -1005,7 +1015,7 @@ function trainerCardGrid(t){
   var skBadge = t.gyms.some(function(g){ return GYMS.find(function(x){ return x.id===g && x.isSkyfit }) }) ? '<span style="background:#1A1A2E;color:#E8B84B;font-size:.6rem;font-weight:800;padding:4px 9px;border-radius:9999px">SK</span>' : ''
   var stars = '★'.repeat(Math.floor(t.rating))
   var specs = t.specialties.map(function(s){ return '<span style="background:var(--z100);color:var(--z600);font-size:.68rem;font-weight:600;padding:3px 9px;border-radius:9999px">' + s + '</span>' }).join('')
-  return '<div onclick="go(\'perfil\',{id:\'' + t.id + '\'})" style="background:#fff;border:1px solid var(--z200);border-radius:20px;overflow:hidden;cursor:pointer;transition:all .2s" onmouseover="this.style.transform=\'translateY(-4px)\';this.style.boxShadow=\'0 20px 48px rgba(9,9,11,.12)\'" onmouseout="this.style.transform=\'translateY(0)\';this.style.boxShadow=\'\'">' +
+  return '<div onclick="go(\'perfil\',{id:\'' + t.id + '\'})" style="background:#fff;border:1px solid var(--z200);border-radius:20px;overflow:hidden;cursor:pointer;transition:transform .2s,box-shadow .2s,border-color .2s" onmouseover="this.style.transform=\'translateY(-5px)\';this.style.boxShadow=\'0 24px 60px rgba(0,0,0,.55)\';this.style.borderColor=\'rgba(230,57,70,.45)\'" onmouseout="this.style.transform=\'translateY(0)\';this.style.boxShadow=\'\';this.style.borderColor=\'var(--z200)\'">' +
     '<div style="position:relative;background:#1a1a2e">' +
       '<img src="' + t.photos[0] + '" alt="' + t.name + '" onerror="this.onerror=null;this.src=\'' + t.avatar + '\';this.style.objectPosition=\'top\'" style="width:100%;height:210px;object-fit:cover;object-position:top;display:block" />' +
       '<div style="position:absolute;inset:0;background:linear-gradient(to top,rgba(0,0,0,.5) 0%,transparent 45%)"></div>' +
@@ -1041,7 +1051,7 @@ function renderLanding(){
     var src = pid ? 'https://images.pexels.com/photos/'+pid+'/pexels-photo-'+pid+'.jpeg?auto=compress&cs=tinysrgb&w=70&h=70&fit=crop' : t.avatar
     return '<img src="'+src+'" onerror="this.onerror=null;this.src=\''+t.avatar+'\'" style="width:34px;height:34px;border-radius:50%;object-fit:cover;border:2.5px solid #fff;margin-left:'+(i?'-10px':'0')+'" />'
   }).join('')
-  var specFilters = SPECIALTIES.map(function(s){ return '<button onclick="S.search.specialty=\'' + s + '\';go(\'buscar\')" style="padding:8px 18px;border-radius:9999px;font-size:.82rem;font-weight:600;border:1.5px solid var(--z200);background:#fff;cursor:pointer;font-family:Outfit,sans-serif;color:var(--z700)" onmouseover="this.style.background=\'var(--orange)\';this.style.color=\'#fff\';this.style.borderColor=\'var(--orange)\'" onmouseout="this.style.background=\'#fff\';this.style.color=\'var(--z700)\';this.style.borderColor=\'var(--z200)\'">' + s + '</button>' }).join('')
+  var specFilters = SPECIALTIES.map(function(s){ return '<button onclick="S.search.specialty=\'' + s + '\';go(\'buscar\')" style="padding:8px 18px;border-radius:9999px;font-size:.82rem;font-weight:600;border:1.5px solid rgba(255,255,255,.13);background:rgba(255,255,255,.04);cursor:pointer;font-family:Outfit,sans-serif;color:rgba(255,255,255,.7);transition:all .15s" onmouseover="this.style.background=\'var(--orange)\';this.style.color=\'#fff\';this.style.borderColor=\'var(--orange)\'" onmouseout="this.style.background=\'rgba(255,255,255,.04)\';this.style.color=\'rgba(255,255,255,.7)\';this.style.borderColor=\'rgba(255,255,255,.13)\'">' + s + '</button>' }).join('')
   var specialtyOpts = SPECIALTIES.map(function(s){ return '<option style="background:#0F0A0A">' + s + '</option>' }).join('')
   var radiusPills = [5,10,20,50].map(function(v){
     var active = S.search.radius===v
@@ -1054,7 +1064,7 @@ function renderLanding(){
   var howSteps = [{n:'01',icon:'📍',t:'Escolha sua região',d:'Informe o bairro e o raio que você aceita se deslocar. Só aparecem personais que vão até você.'},{n:'02',icon:'📅',t:'Compare preços e agenda',d:'Veja horários disponíveis em tempo real, notas e valores lado a lado. Sem aguardar resposta.'},{n:'03',icon:'💳',t:'Reserve e pague online',d:'Cartão ou Pix. O personal recebe a notificação na hora. Nenhuma mensagem necessária.'},{n:'04',icon:'🏋',t:'Treine sem complicação',d:'Apareça na academia no horário marcado. Qualidade garantida, preço justo, sem enrolação.'}].map(function(s){ return '<div style="text-align:center;padding:0 24px;position:relative"><div style="width:72px;height:72px;border-radius:50%;background:rgba(230,57,70,.1);border:1.5px solid rgba(230,57,70,.3);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;position:relative;z-index:1"><span style="font-size:1.5rem">' + s.icon + '</span></div><div style="font-size:.65rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--orange);margin-bottom:8px">' + s.n + '</div><h4 style="color:#fff;font-size:.95rem;margin-bottom:8px">' + s.t + '</h4><p style="font-size:.8rem;color:rgba(255,255,255,.45);line-height:1.65">' + s.d + '</p></div>' }).join('')
   var skyStats = [{n:'3',l:'Unidades'},{n:'40+',l:'Personais ativos'},{n:'500+',l:'Alunos atendidos'}].map(function(s){ return '<div style="text-align:center"><div style="color:#E8B84B;font-size:1.4rem;font-weight:900">' + s.n + '</div><div style="color:rgba(255,255,255,.45);font-size:.72rem;margin-top:2px">' + s.l + '</div></div>' }).join('')
   var planCards = [{name:'Starter',price:97,leads:'15 leads/mês',features:['Perfil verificado','Agenda online','Raio até 10km','Suporte básico'],pop:false},{name:'Profissional',price:197,leads:'40 leads/mês',features:['Destaque nos resultados','Agenda + notificações','Raio ilimitado','Suporte prioritário','Relatório mensal'],pop:true,tag:'Mais popular'},{name:'Premium',price:297,leads:'Leads ilimitados',features:['Topo de resultados','Badge verificado premium','Suporte VIP 24h','Analytics avançado'],pop:false},{name:'Enterprise',price:497,leads:'Múltiplos perfis',features:['Tudo do Premium','Gerente dedicado','Integração CRM','Treinamento da equipe'],pop:false}].map(function(p){ var feats=p.features.map(function(f){ return '<div style="font-size:.82rem;color:' + (p.pop?'rgba(255,255,255,.9)':'rgba(255,255,255,.6)') + ';display:flex;align-items:center;gap:7px"><span style="color:' + (p.pop?'#fff':'var(--green)') + ';font-weight:900;font-size:.75rem">&#x2713;</span>' + f + '</div>' }).join(''); var tagHtml = p.tag ? '<div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#fff;color:var(--orange-6);font-size:.65rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;padding:4px 14px;border-radius:9999px;white-space:nowrap">' + p.tag + '</div>' : ''; return '<div style="background:' + (p.pop?'var(--orange)':'rgba(255,255,255,.05)') + ';border:1px solid ' + (p.pop?'var(--orange)':'rgba(255,255,255,.1)') + ';border-radius:20px;padding:28px 22px;position:relative">' + tagHtml + '<div style="font-size:.72rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:' + (p.pop?'rgba(255,255,255,.7)':'rgba(255,255,255,.4)') + ';margin-bottom:12px">' + p.name + '</div><div style="font-size:2.2rem;font-weight:900;color:#fff;line-height:1">R$ ' + p.price + '</div><div style="font-size:.78rem;color:' + (p.pop?'rgba(255,255,255,.6)':'rgba(255,255,255,.35)') + ';margin-bottom:22px">/mês · ' + p.leads + '</div><div style="display:flex;flex-direction:column;gap:8px;margin-bottom:22px">' + feats + '</div><button onclick="go(\'cadastro\')" style="width:100%;background:' + (p.pop?'#fff':'rgba(255,255,255,.1)') + ';color:' + (p.pop?'var(--orange-6)':'#fff') + ';border:none;border-radius:10px;padding:12px;font-family:Outfit,sans-serif;font-size:.88rem;font-weight:700;cursor:pointer">' + (p.pop?'Começar agora →':'Escolher plano') + '</button></div>' }).join('')
-  var testimonials = TESTIMONIALS.map(function(t){ return '<div style="background:#fff;border:1px solid var(--z200);border-radius:20px;padding:28px"><div style="color:#F59E0B;font-size:.95rem;margin-bottom:14px">★★★★★</div><p style="font-size:.92rem;line-height:1.75;color:var(--z700);margin-bottom:20px;font-style:italic">&ldquo;' + t.text + '&rdquo;</p><div style="display:flex;align-items:center;gap:12px"><img src="' + t.avatar + '" style="width:44px;height:44px;border-radius:50%;object-fit:cover" alt="' + t.name + '" /><div><div style="font-weight:700;font-size:.88rem;color:var(--z900)">' + t.name + '</div><div style="font-size:.75rem;color:var(--z500);margin-top:2px">' + t.role + '</div></div></div></div>' }).join('')
+  var testimonials = TESTIMONIALS.map(function(t){ return '<div style="background:var(--ink3);border:1px solid var(--hair);border-radius:20px;padding:28px"><div style="color:#F5A623;font-size:.95rem;margin-bottom:14px;letter-spacing:2px">★★★★★</div><p style="font-size:.92rem;line-height:1.75;color:var(--on-dark);margin-bottom:20px">&ldquo;' + t.text + '&rdquo;</p><div style="display:flex;align-items:center;gap:12px"><img src="' + t.avatar + '" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid var(--hair2)" alt="' + t.name + '" /><div><div style="font-weight:700;font-size:.88rem;color:#fff">' + t.name + '</div><div style="font-size:.75rem;color:var(--on-dark-3);margin-top:2px">' + t.role + '</div></div></div></div>' }).join('')
 
   return `
 
@@ -1197,15 +1207,16 @@ function renderLanding(){
 </div>
 
 <!-- ═══ PERSONAIS EM DESTAQUE ═══ -->
-<section style="padding:80px 0;background:#fff">
+<section style="padding:88px 0;background:var(--ink);position:relative">
+  <div style="position:absolute;top:0;left:0;right:0;height:1px;background:linear-gradient(90deg,transparent,rgba(230,57,70,.25),transparent)"></div>
   <div class="container">
     <div style="display:flex;align-items:flex-end;justify-content:space-between;margin-bottom:40px;flex-wrap:wrap;gap:16px">
       <div>
-        <div class="eyebrow">Personais em destaque</div>
-        <h2 style="margin-top:8px">Os mais procurados agora.</h2>
-        <p style="margin-top:8px;font-size:.92rem">Verificados, avaliados e com horários disponíveis hoje.</p>
+        <div class="eyebrow" style="color:var(--orange)">Personais em destaque</div>
+        <h2 style="margin-top:8px;color:#fff">Os mais procurados agora.</h2>
+        <p style="margin-top:8px;font-size:.92rem;color:var(--on-dark-2)">Verificados, avaliados e com horários disponíveis hoje.</p>
       </div>
-      <button class="btn btn-outline btn-lg" onclick="go('buscar')">Ver todos os personais →</button>
+      <button class="btn btn-lg" onclick="go('buscar')" style="background:transparent;color:#fff;border:1.5px solid var(--hair2)" onmouseover="this.style.background='var(--hair)'" onmouseout="this.style.background='transparent'">Ver todos os personais →</button>
     </div>
 
     <!-- SPECIALTY FILTER -->
@@ -1275,11 +1286,11 @@ function renderLanding(){
 </section>
 
 <!-- ═══ DEPOIMENTOS ═══ -->
-<section style="padding:80px 0;background:var(--z50)">
+<section style="padding:88px 0;background:var(--ink2)">
   <div class="container">
     <div style="text-align:center;margin-bottom:48px">
-      <div class="eyebrow">Depoimentos</div>
-      <h2 style="margin-top:10px">Quem usa, não volta atrás.</h2>
+      <div class="eyebrow" style="color:var(--orange)">Depoimentos</div>
+      <h2 style="margin-top:10px;color:#fff">Quem usa, não volta atrás.</h2>
     </div>
     <div style="display:grid;grid-template-columns:repeat(3,1fr);gap:20px">
       ${testimonials}
