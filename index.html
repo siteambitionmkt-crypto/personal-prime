@@ -490,6 +490,7 @@ select.input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xml
   .cad-grid2{grid-template-columns:1fr!important}
 }
 </style>
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
 </head>
 <body>
 
@@ -627,6 +628,64 @@ select.input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xml
 </div>
 
 <script>
+// ─── SUPABASE ────────────────────────────────────────────────────────────────
+const SUPA_URL = 'https://xyshougnfciyuthyojvm.supabase.co'
+const SUPA_ANON = 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Inh5c2hvdWduZmNpeXV0aHlvanZtIiwicm9sZSI6ImFub24iLCJpYXQiOjE3ODI1MDUwNzEsImV4cCI6MjA5ODA4MTA3MX0.voYZHL2bITVcWtBlBmxu-1x6uaE9_BSZsUmGoiFgbr8'
+const sb = window.supabase.createClient(SUPA_URL, SUPA_ANON)
+let USER = null            // sessão atual (auth.user) ou null
+let PROFILE = null         // linha da tabela profiles
+
+// Mapeia uma linha do banco (tabela trainers) para o formato usado pelo render
+const DEFAULT_GYMS = ['g2','g4','g3','g5','sf3']
+function mapTrainer(row, i){
+  return {
+    id: row.id,
+    name: row.name,
+    avatar: row.avatar_url || 'https://randomuser.me/api/portraits/lego/1.jpg',
+    photos: (row.photos && row.photos.length) ? row.photos : [row.avatar_url],
+    specialties: row.specialties || [],
+    rating: Number(row.rating) || 0,
+    reviews: row.review_count || 0,
+    pricePerHour: Number(row.price_per_hour) || 0,
+    gyms: [DEFAULT_GYMS[i % DEFAULT_GYMS.length], DEFAULT_GYMS[(i+1) % DEFAULT_GYMS.length]],
+    bio: row.bio || '',
+    verified: !!row.verified,
+    responseTime: row.response_time || 'Responde em 1h',
+    completedSessions: row.completed_sessions || 0,
+    neighborhood: row.neighborhood || '',
+    city: row.city || 'São Paulo',
+  }
+}
+
+// Carrega personais do banco; mantém o mock como fallback se a rede falhar
+async function loadTrainers(){
+  try{
+    const { data, error } = await sb.from('trainers').select('*').eq('active', true).order('rating', { ascending:false })
+    if(error) throw error
+    if(data && data.length){ TRAINERS = data.map(mapTrainer); render() }
+  }catch(err){ console.warn('Usando dados mock (DB indisponível):', err.message) }
+}
+
+// Sessão / Auth
+async function initSession(){
+  const { data:{ session } } = await sb.auth.getSession()
+  USER = session?.user || null
+  if(USER){ await loadProfile() }
+  updateAuthUI()
+  sb.auth.onAuthStateChange((_e, sess)=>{ USER = sess?.user || null; if(USER) loadProfile(); else PROFILE = null; updateAuthUI() })
+}
+async function loadProfile(){
+  if(!USER) return
+  const { data } = await sb.from('profiles').select('*').eq('id', USER.id).single()
+  PROFILE = data || null
+}
+function updateAuthUI(){
+  // atualiza o botão "Entrar como Aluno" para mostrar o nome quando logado
+  document.querySelectorAll('[data-auth-label]').forEach(el=>{
+    el.textContent = USER ? (PROFILE?.full_name || 'Minha conta') : 'Entrar como Aluno'
+  })
+}
+
 // ─── DATA ────────────────────────────────────────────────────────────────────
 
 const GYMS = [
@@ -643,7 +702,7 @@ const GYMS = [
 ]
 
 function px(id){ return 'https://images.pexels.com/photos/'+id+'/pexels-photo-'+id+'.jpeg?auto=compress&cs=tinysrgb&w=400&h=500&fit=crop' }
-const TRAINERS = [
+let TRAINERS = [
   { id:'t1', name:'Rodrigo Silva', avatar:'https://randomuser.me/api/portraits/men/42.jpg',
     photos:[px(1552249),px(1552252),px(841130)],
     specialties:['Hipertrofia','Crossfit'], rating:4.9, reviews:187, pricePerHour:160, gyms:['g2','g4'], bio:'Especialista em hipertrofia com 8 anos de experiência. Formado em Educação Física pela USP com certificação CrossFit Level 2. Referência em musculação avançada.', verified:true, responseTime:'Responde em 1h', completedSessions:342, neighborhood:'Vila Mariana', city:'São Paulo' },
@@ -745,7 +804,81 @@ function switchTab(t){
   document.getElementById('mf-login').classList.toggle('hidden',t!=='login')
   document.getElementById('mf-register').classList.toggle('hidden',t!=='register')
 }
-function handleLogin(e){ e.preventDefault(); closeLogin() }
+async function handleLogin(e){
+  e.preventDefault()
+  const form = e.target
+  const btn = form.querySelector('button')
+  const inputs = form.querySelectorAll('input')
+  const original = btn.textContent
+  btn.disabled = true; btn.textContent = 'Aguarde...'
+  try{
+    if(form.id === 'mf-register'){
+      const name = inputs[0].value.trim()
+      const email = inputs[1].value.trim()
+      const pass = inputs[2].value
+      const { error } = await sb.auth.signUp({ email, password:pass, options:{ data:{ full_name:name, role:'student' } } })
+      if(error) throw error
+      authFeedback(form, 'Conta criada! Verifique seu e-mail para confirmar.', true)
+      setTimeout(closeLogin, 1800)
+    } else {
+      const email = inputs[0].value.trim()
+      const pass = inputs[1].value
+      const { error } = await sb.auth.signInWithPassword({ email, password:pass })
+      if(error) throw error
+      closeLogin()
+    }
+  }catch(err){
+    authFeedback(form, traduzErroAuth(err.message), false)
+  }finally{
+    btn.disabled = false; btn.textContent = original
+  }
+}
+function authFeedback(form, msg, ok){
+  let fb = form.querySelector('.auth-fb')
+  if(!fb){ fb = document.createElement('div'); fb.className='auth-fb'; fb.style.cssText='font-size:.8rem;font-weight:600;margin-top:8px;text-align:center'; form.appendChild(fb) }
+  fb.style.color = ok ? '#059669' : '#E63946'
+  fb.textContent = msg
+}
+function traduzErroAuth(m){
+  if(/Invalid login/i.test(m)) return 'E-mail ou senha incorretos.'
+  if(/already registered/i.test(m)) return 'Este e-mail já está cadastrado.'
+  if(/at least 6/i.test(m)) return 'A senha precisa ter no mínimo 6 caracteres.'
+  return m
+}
+async function logout(){ await sb.auth.signOut(); go('landing') }
+
+const isUUID = v => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v||'')
+async function finalizarReserva(){
+  // Exige login para reservar
+  if(!USER){ openLogin(); authNotice('Entre ou crie sua conta para concluir a reserva.'); return }
+  const b = S.booking
+  const t = TRAINERS.find(x=>x.id===b.trainerId)
+  const plan = PLANS.find(p=>p.id===b.plan)
+  const total = (t && plan) ? planPrice(t, plan) : null
+  // Só grava no banco se o trainer for real (UUID vindo do Supabase)
+  if(isUUID(b.trainerId)){
+    try{
+      await sb.from('bookings').insert({
+        student_id: USER.id,
+        trainer_id: b.trainerId,
+        plan: plan?.name || b.plan,
+        session_date: b.date,
+        session_time: b.time,
+        price_total: total,
+        status: 'pending',
+        payment_status: 'unpaid'
+      })
+    }catch(err){ console.warn('Falha ao salvar reserva:', err.message) }
+  }
+  go('confirmacao')
+}
+function authNotice(msg){
+  const modal = document.getElementById('login-modal')
+  if(!modal) return
+  let n = modal.querySelector('.auth-notice')
+  if(!n){ n = document.createElement('div'); n.className='auth-notice'; n.style.cssText='background:#FEF3C7;color:#92400E;font-size:.8rem;font-weight:600;padding:10px 14px;border-radius:10px;margin-bottom:12px;text-align:center'; modal.querySelector('.mtabs').before(n) }
+  n.textContent = msg
+}
 document.getElementById('login-modal').addEventListener('click',e=>{ if(e.target===e.currentTarget) closeLogin() })
 document.getElementById('chat-modal').addEventListener('click',e=>{ if(e.target===e.currentTarget) closeChat() })
 
@@ -1492,7 +1625,7 @@ function renderReservar(){
     </div>
     <div class="bnav">
       <button class="btn btn-outline" onclick="S.booking.step=3;render()">← Voltar</button>
-      <button class="btn btn-primary btn-lg" onclick="go('confirmacao')">Finalizar e pagar →</button>
+      <button class="btn btn-primary btn-lg" onclick="finalizarReserva()">Finalizar e pagar →</button>
     </div>`:''}
   </div>
 </div>`
@@ -1800,6 +1933,8 @@ document.addEventListener('click',function(e){
 // INIT
 render()
 document.getElementById('footer').style.display = 'block'
+initSession()
+loadTrainers()
 </script>
 </body>
 </html>
