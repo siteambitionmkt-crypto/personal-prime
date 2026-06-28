@@ -499,10 +499,74 @@ select.input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xml
   .plan-plat-grid{grid-template-columns:1fr 1fr!important}
   .cad-grid2{grid-template-columns:1fr!important}
 }
+
+/* ═══════════ MOTION & SURREAL LAYER ═══════════ */
+html.lenis,html.lenis body{height:auto}
+.lenis.lenis-smooth{scroll-behavior:auto!important}
+.lenis.lenis-smooth [data-lenis-prevent]{overscroll-behavior:contain}
+.lenis.lenis-stopped{overflow:hidden}
+
+/* Scroll-reveal — estado inicial e animado via GSAP (fallback: visível) */
+.reveal{opacity:0;transform:translate3d(0,28px,0)}
+.gsap-ready .reveal{will-change:transform,opacity}
+.no-gsap .reveal{opacity:1;transform:none}
+
+/* Grain/textura sutil sobre tudo */
+#grain{position:fixed;inset:0;z-index:9998;pointer-events:none;opacity:.035;mix-blend-mode:overlay;background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='180' height='180'%3E%3Cfilter id='n'%3E%3CfeTurbulence type='fractalNoise' baseFrequency='0.8' numOctaves='3'/%3E%3C/filter%3E%3Crect width='100%25' height='100%25' filter='url(%23n)'/%3E%3C/svg%3E")}
+
+/* Aurora animada no hero */
+@keyframes aurora{0%{transform:translate(0,0) rotate(0deg);opacity:.55}50%{transform:translate(6%,-4%) rotate(8deg);opacity:.8}100%{transform:translate(0,0) rotate(0deg);opacity:.55}}
+.aurora{position:absolute;border-radius:50%;filter:blur(40px);pointer-events:none;animation:aurora 14s ease-in-out infinite}
+
+/* Botões com brilho premium + press tátil */
+.btn-primary{position:relative;overflow:hidden}
+.btn-primary::after{content:'';position:absolute;top:0;left:-120%;width:60%;height:100%;background:linear-gradient(100deg,transparent,rgba(255,255,255,.35),transparent);transform:skewX(-18deg);transition:left .6s ease}
+.btn-primary:hover::after{left:140%}
+.btn:active{transform:translateY(1px) scale(.985)}
+
+/* Glow pulsante reutilizável */
+@keyframes glow-pulse{0%,100%{box-shadow:0 0 0 0 rgba(230,57,70,.35)}50%{box-shadow:0 0 0 14px rgba(230,57,70,0)}}
+.glow-pulse{animation:glow-pulse 2.4s ease-out infinite}
+
+/* Scrollbar premium */
+::-webkit-scrollbar{width:11px;height:11px}
+::-webkit-scrollbar-track{background:var(--ink)}
+::-webkit-scrollbar-thumb{background:linear-gradient(var(--z700),var(--z800));border-radius:9999px;border:3px solid var(--ink)}
+::-webkit-scrollbar-thumb:hover{background:var(--orange)}
+
+/* Transição de tela */
+#main.page-anim{animation:page-in .5s cubic-bezier(.16,.84,.44,1)}
+@keyframes page-in{from{opacity:0;transform:translateY(14px)}to{opacity:1;transform:none}}
+
+/* Toasts */
+#toast-wrap{position:fixed;top:84px;right:20px;z-index:9999;display:flex;flex-direction:column;gap:10px;pointer-events:none}
+.toast{display:flex;align-items:center;gap:11px;background:rgba(16,18,22,.92);backdrop-filter:blur(14px);border:1px solid var(--hair2);color:#fff;padding:13px 18px;border-radius:14px;font-size:.88rem;font-weight:600;box-shadow:var(--sd);transform:translateX(120%);opacity:0;transition:transform .5s cubic-bezier(.16,.84,.44,1),opacity .5s;max-width:340px}
+.toast.show{transform:translateX(0);opacity:1}
+.toast-ico{width:24px;height:24px;border-radius:50%;display:flex;align-items:center;justify-content:center;font-size:.8rem;flex-shrink:0;font-weight:900}
+.toast-ok .toast-ico{background:rgba(16,185,129,.2);color:#34D399}
+.toast-err .toast-ico{background:rgba(230,57,70,.2);color:#ff6b74}
+.toast-info .toast-ico{background:rgba(59,130,246,.2);color:#60A5FA}
+
+/* Cards "magnéticos" (leve tilt no hover via JS define --mx/--my) */
+.magnetic{transition:transform .25s cubic-bezier(.16,.84,.44,1)}
+
+/* Skeleton shimmer */
+@keyframes shimmer{0%{background-position:-400px 0}100%{background-position:400px 0}}
+.skeleton{background:linear-gradient(90deg,var(--ink3) 0px,var(--ink4) 200px,var(--ink3) 400px);background-size:800px 100%;animation:shimmer 1.4s linear infinite;border-radius:12px}
+
+@media(prefers-reduced-motion:reduce){
+  .reveal{opacity:1!important;transform:none!important}
+  .aurora,.glow-pulse,.btn-primary::after{animation:none!important}
+}
 </style>
 <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
 </head>
 <body>
+<div id="grain"></div>
+<div id="toast-wrap"></div>
 
 <!-- NAV -->
 <nav id="nav">
@@ -773,7 +837,7 @@ function go(screen, params={}) {
   S.activeTab = 'sobre'
   if(screen==='reservar' && !S.booking.trainerId) S.booking = {...S.booking, step:1, plan:null, gym:null, date:null, time:null, trainerId:params.trainerId}
   render()
-  window.scrollTo({top:0,behavior:'instant'})
+  if(lenis){ lenis.scrollTo(0,{immediate:true}) } else { window.scrollTo({top:0,behavior:'instant'}) }
   document.getElementById('footer').style.display = screen==='landing' ? 'block' : 'none'
 }
 
@@ -836,6 +900,7 @@ async function handleLogin(e){
       const { error } = await sb.auth.signInWithPassword({ email, password:pass })
       if(error) throw error
       closeLogin()
+      toast('Bem-vindo de volta!','ok')
     }
   }catch(err){
     authFeedback(form, traduzErroAuth(err.message), false)
@@ -881,6 +946,7 @@ async function finalizarReserva(){
     }catch(err){ console.warn('Falha ao salvar reserva:', err.message) }
   }
   go('confirmacao')
+  toast('Reserva confirmada com sucesso!','ok')
 }
 function authNotice(msg){
   const modal = document.getElementById('login-modal')
@@ -902,10 +968,10 @@ function avancarCadastro(){
     if(c.senha !== c.senha2){ if(err) err.textContent='As senhas não conferem.'; return }
   }
   if(step===2){
-    if(!c.specs || !c.specs.length){ alert('Selecione pelo menos uma especialidade.'); return }
+    if(!c.specs || !c.specs.length){ toast('Selecione pelo menos uma especialidade.','err'); return }
   }
   if(step===5){
-    if(!c.plan){ alert('Selecione um plano para continuar.'); return }
+    if(!c.plan){ toast('Selecione um plano para continuar.','err'); return }
     criarPerfilPersonal()
     return
   }
@@ -938,7 +1004,7 @@ async function criarPerfilPersonal(){
     go('cadastro-sucesso')
   }catch(err){
     if(btn){ btn.disabled = false; btn.textContent = 'Criar meu perfil →' }
-    alert('Não foi possível criar seu perfil: ' + traduzErroAuth(err.message))
+    toast('Não foi possível criar seu perfil: ' + traduzErroAuth(err.message),'err')
   }
 }
 document.getElementById('login-modal').addEventListener('click',e=>{ if(e.target===e.currentTarget) closeLogin() })
@@ -1060,7 +1126,7 @@ function renderLanding(){
     var color = active ? '#ff8589' : 'rgba(255,255,255,.55)'
     return '<button onclick="S.search.radius=' + v + ';render()" style="background:' + bg + ';border:1px solid ' + border + ';color:' + color + ';border-radius:9999px;padding:6px 16px;font-family:Outfit,sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .15s;outline:none">' + v + 'km</button>'
   }).join('')
-  var statsBar =[{n:'850+', l:'Personais ativos'},{n:'120+', l:'Academias parceiras'},{n:'4.9★', l:'Avaliação média'},{n:'15min', l:'Para sua 1ª aula'}].map(function(s){ return '<div><div style="font-size:1.6rem;font-weight:900;color:#fff;line-height:1">' + s.n + '</div><div style="font-size:.75rem;color:rgba(255,255,255,.75);margin-top:3px">' + s.l + '</div></div>' }).join('')
+  var statsBar =[{n:'850+', l:'Personais ativos'},{n:'120+', l:'Academias parceiras'},{n:'4.9★', l:'Avaliação média'},{n:'15min', l:'Para sua 1ª aula'}].map(function(s){ return '<div><div data-count="' + s.n + '" style="font-size:1.7rem;font-weight:900;color:#fff;line-height:1;font-variant-numeric:tabular-nums">' + s.n + '</div><div style="font-size:.75rem;color:rgba(255,255,255,.82);margin-top:4px;font-weight:500">' + s.l + '</div></div>' }).join('')
   var howSteps = [{n:'01',icon:'📍',t:'Escolha sua região',d:'Informe o bairro e o raio que você aceita se deslocar. Só aparecem personais que vão até você.'},{n:'02',icon:'📅',t:'Compare preços e agenda',d:'Veja horários disponíveis em tempo real, notas e valores lado a lado. Sem aguardar resposta.'},{n:'03',icon:'💳',t:'Reserve e pague online',d:'Cartão ou Pix. O personal recebe a notificação na hora. Nenhuma mensagem necessária.'},{n:'04',icon:'🏋',t:'Treine sem complicação',d:'Apareça na academia no horário marcado. Qualidade garantida, preço justo, sem enrolação.'}].map(function(s){ return '<div style="text-align:center;padding:0 24px;position:relative"><div style="width:72px;height:72px;border-radius:50%;background:rgba(230,57,70,.1);border:1.5px solid rgba(230,57,70,.3);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;position:relative;z-index:1"><span style="font-size:1.5rem">' + s.icon + '</span></div><div style="font-size:.65rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--orange);margin-bottom:8px">' + s.n + '</div><h4 style="color:#fff;font-size:.95rem;margin-bottom:8px">' + s.t + '</h4><p style="font-size:.8rem;color:rgba(255,255,255,.45);line-height:1.65">' + s.d + '</p></div>' }).join('')
   var skyStats = [{n:'3',l:'Unidades'},{n:'40+',l:'Personais ativos'},{n:'500+',l:'Alunos atendidos'}].map(function(s){ return '<div style="text-align:center"><div style="color:#E8B84B;font-size:1.4rem;font-weight:900">' + s.n + '</div><div style="color:rgba(255,255,255,.45);font-size:.72rem;margin-top:2px">' + s.l + '</div></div>' }).join('')
   var planCards = [{name:'Starter',price:97,leads:'15 leads/mês',features:['Perfil verificado','Agenda online','Raio até 10km','Suporte básico'],pop:false},{name:'Profissional',price:197,leads:'40 leads/mês',features:['Destaque nos resultados','Agenda + notificações','Raio ilimitado','Suporte prioritário','Relatório mensal'],pop:true,tag:'Mais popular'},{name:'Premium',price:297,leads:'Leads ilimitados',features:['Topo de resultados','Badge verificado premium','Suporte VIP 24h','Analytics avançado'],pop:false},{name:'Enterprise',price:497,leads:'Múltiplos perfis',features:['Tudo do Premium','Gerente dedicado','Integração CRM','Treinamento da equipe'],pop:false}].map(function(p){ var feats=p.features.map(function(f){ return '<div style="font-size:.82rem;color:' + (p.pop?'rgba(255,255,255,.9)':'rgba(255,255,255,.6)') + ';display:flex;align-items:center;gap:7px"><span style="color:' + (p.pop?'#fff':'var(--green)') + ';font-weight:900;font-size:.75rem">&#x2713;</span>' + f + '</div>' }).join(''); var tagHtml = p.tag ? '<div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#fff;color:var(--orange-6);font-size:.65rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;padding:4px 14px;border-radius:9999px;white-space:nowrap">' + p.tag + '</div>' : ''; return '<div style="background:' + (p.pop?'var(--orange)':'rgba(255,255,255,.05)') + ';border:1px solid ' + (p.pop?'var(--orange)':'rgba(255,255,255,.1)') + ';border-radius:20px;padding:28px 22px;position:relative">' + tagHtml + '<div style="font-size:.72rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:' + (p.pop?'rgba(255,255,255,.7)':'rgba(255,255,255,.4)') + ';margin-bottom:12px">' + p.name + '</div><div style="font-size:2.2rem;font-weight:900;color:#fff;line-height:1">R$ ' + p.price + '</div><div style="font-size:.78rem;color:' + (p.pop?'rgba(255,255,255,.6)':'rgba(255,255,255,.35)') + ';margin-bottom:22px">/mês · ' + p.leads + '</div><div style="display:flex;flex-direction:column;gap:8px;margin-bottom:22px">' + feats + '</div><button onclick="go(\'cadastro\')" style="width:100%;background:' + (p.pop?'#fff':'rgba(255,255,255,.1)') + ';color:' + (p.pop?'var(--orange-6)':'#fff') + ';border:none;border-radius:10px;padding:12px;font-family:Outfit,sans-serif;font-size:.88rem;font-weight:700;cursor:pointer">' + (p.pop?'Começar agora →':'Escolher plano') + '</button></div>' }).join('')
@@ -1070,9 +1136,10 @@ function renderLanding(){
 
 <!-- ═══ HERO ═══ -->
 <section style="background:linear-gradient(135deg,#0A0A0F 0%,#130810 40%,#0F0A0A 100%);min-height:100dvh;display:flex;flex-direction:column;justify-content:center;padding:100px 0 70px;position:relative;overflow:hidden">
-  <!-- Background glow -->
-  <div style="position:absolute;top:-20%;right:-10%;width:600px;height:600px;background:radial-gradient(circle,rgba(230,57,70,.18),transparent 65%);border-radius:50%;pointer-events:none"></div>
-  <div style="position:absolute;bottom:-20%;left:-5%;width:400px;height:400px;background:radial-gradient(circle,rgba(230,57,70,.1),transparent 65%);border-radius:50%;pointer-events:none"></div>
+  <!-- Aurora animada -->
+  <div class="aurora" data-parallax="0.18" style="top:-22%;right:-12%;width:620px;height:620px;background:radial-gradient(circle,rgba(230,57,70,.22),transparent 64%)"></div>
+  <div class="aurora" data-parallax="-0.12" style="bottom:-24%;left:-8%;width:480px;height:480px;background:radial-gradient(circle,rgba(124,58,237,.14),transparent 66%);animation-delay:-6s"></div>
+  <div class="aurora" data-parallax="0.08" style="top:30%;left:38%;width:380px;height:380px;background:radial-gradient(circle,rgba(230,57,70,.1),transparent 68%);animation-delay:-9s"></div>
 
   <div class="container">
     <div style="display:grid;grid-template-columns:1.05fr 1fr;gap:64px;align-items:center">
@@ -1121,7 +1188,7 @@ function renderLanding(){
               <input type="range" min="0" max="70" step="5" value="${S.search.radius}" style="flex:1;accent-color:#E63946;cursor:pointer;height:3px" oninput="S.search.radius=+this.value;var el=document.getElementById('rad-val');if(el)el.textContent=this.value+'km'" />
               <span id="rad-val" style="font-size:.88rem;color:#0A0A0F;font-weight:900;min-width:42px;text-align:right;flex-shrink:0">${S.search.radius}km</span>
             </div>
-            <button id="hero-search-btn" onclick="handleSearch()" style="width:100%;background:#E63946;color:#fff;border:none;border-radius:16px;padding:14px;font-family:Outfit,sans-serif;font-size:1rem;font-weight:800;cursor:pointer;transition:background .15s,opacity .15s;letter-spacing:.01em" onmouseover="if(!this.disabled)this.style.background='#C1121F'" onmouseout="this.style.background='#E63946'">Buscar personal →</button>
+            <button id="hero-search-btn" class="glow-pulse" onclick="handleSearch()" style="width:100%;background:#E63946;color:#fff;border:none;border-radius:16px;padding:15px;font-family:Outfit,sans-serif;font-size:1rem;font-weight:800;cursor:pointer;transition:background .15s,opacity .15s,transform .15s;letter-spacing:.01em" onmouseover="if(!this.disabled){this.style.background='#C1121F';this.style.transform='translateY(-1px)'}" onmouseout="this.style.background='#E63946';this.style.transform=''">Buscar personal →</button>
           </div>
           <div id="cep-feedback" style="min-height:0;padding:0 4px;margin-top:6px"></div>
           <div style="text-align:center;margin-top:12px">
@@ -1622,7 +1689,7 @@ function renderReservar(){
     </div>
     <div class="bnav">
       <button class="btn btn-outline" onclick="go('perfil',{id:'${t.id}'})">Cancelar</button>
-      <button class="btn btn-primary" onclick="if(S.booking.plan){S.booking.step=2;render()}else{alert('Selecione um plano para continuar')}">Continuar →</button>
+      <button class="btn btn-primary" onclick="if(S.booking.plan){S.booking.step=2;render()}else{toast('Selecione um plano para continuar','err')}">Continuar →</button>
     </div>`:''
 
     }${step===2?`
@@ -1639,7 +1706,7 @@ function renderReservar(){
     </div>
     <div class="bnav">
       <button class="btn btn-outline" onclick="S.booking.step=1;render()">← Voltar</button>
-      <button class="btn btn-primary" onclick="if(S.booking.gym){S.booking.step=3;render()}else{alert('Selecione uma academia')}">Continuar →</button>
+      <button class="btn btn-primary" onclick="if(S.booking.gym){S.booking.step=3;render()}else{toast('Selecione uma academia','err')}">Continuar →</button>
     </div>`:''}
 
     ${step===3?`
@@ -1663,7 +1730,7 @@ function renderReservar(){
     </div>
     <div class="bnav">
       <button class="btn btn-outline" onclick="S.booking.step=2;render()">← Voltar</button>
-      <button class="btn btn-primary" onclick="if(S.booking.date&&S.booking.time){S.booking.step=4;render()}else{alert('Selecione data e horário')}">Continuar →</button>
+      <button class="btn btn-primary" onclick="if(S.booking.date&&S.booking.time){S.booking.step=4;render()}else{toast('Selecione data e horário','err')}">Continuar →</button>
     </div>`:''}
 
     ${step===4?`
@@ -1981,6 +2048,102 @@ function render(){
   }
   main.innerHTML = (screens[S.screen] || renderLanding)()
   footer.style.display = S.screen==='landing' ? 'block' : 'none'
+  // transição de tela
+  main.classList.remove('page-anim'); void main.offsetWidth; main.classList.add('page-anim')
+  // (re)inicia a camada de movimento após o novo DOM
+  requestAnimationFrame(initMotion)
+}
+
+// ═══════════ MOTION LAYER ═══════════
+let lenis = null
+function initSmoothScroll(){
+  if(lenis || typeof Lenis==='undefined') return
+  lenis = new Lenis({ duration:1.1, easing:t=>Math.min(1,1.001-Math.pow(2,-10*t)), smoothWheel:true })
+  function raf(time){ lenis.raf(time); requestAnimationFrame(raf) }
+  requestAnimationFrame(raf)
+  if(typeof ScrollTrigger!=='undefined'){ lenis.on('scroll', ScrollTrigger.update) }
+}
+
+function initMotion(){
+  const hasGSAP = typeof gsap!=='undefined' && typeof ScrollTrigger!=='undefined'
+  document.documentElement.classList.toggle('gsap-ready', hasGSAP)
+  document.documentElement.classList.toggle('no-gsap', !hasGSAP)
+  if(!hasGSAP) return
+  gsap.registerPlugin(ScrollTrigger)
+  // limpa triggers da tela anterior
+  ScrollTrigger.getAll().forEach(t=>t.kill())
+
+  const main = document.getElementById('main')
+  // Marca blocos de nível superior como reveal e anima na entrada do viewport
+  const blocks = main.querySelectorAll(':scope > section, :scope > div')
+  blocks.forEach(block=>{
+    const kids = block.querySelectorAll(':scope .container > *, :scope > .container > *')
+    const targets = kids.length ? kids : [block]
+    gsap.fromTo(targets, { opacity:0, y:34 }, {
+      opacity:1, y:0, duration:.9, ease:'power3.out', stagger:.08,
+      scrollTrigger:{ trigger:block, start:'top 82%', once:true }
+    })
+  })
+
+  // Parallax nos brilhos/aurora marcados
+  main.querySelectorAll('[data-parallax]').forEach(el=>{
+    const speed = parseFloat(el.getAttribute('data-parallax')) || .2
+    gsap.to(el, { yPercent:speed*100, ease:'none', scrollTrigger:{ trigger:el.closest('section')||el, start:'top top', end:'bottom top', scrub:true } })
+  })
+
+  // Contadores animados
+  main.querySelectorAll('[data-count]').forEach(el=>{
+    const raw = el.getAttribute('data-count')
+    const num = parseFloat(raw.replace(/[^\d.]/g,''))
+    const suffix = raw.replace(/[\d.,\s]/g,'')
+    const obj = { v:0 }
+    gsap.to(obj, { v:num, duration:1.6, ease:'power2.out',
+      scrollTrigger:{ trigger:el, start:'top 90%', once:true },
+      onUpdate:()=>{ el.textContent = (num%1?obj.v.toFixed(1):Math.round(obj.v)) + suffix }
+    })
+  })
+
+  // Entrada do hero (apenas na landing)
+  if(S.screen==='landing'){
+    const hero = main.querySelector('section')
+    if(hero){
+      const seq = hero.querySelectorAll(':scope .container > div > div > *')
+      gsap.killTweensOf(seq)
+    }
+  }
+  bindMagnetic()
+}
+
+// Botões/elementos magnéticos
+function bindMagnetic(){
+  document.querySelectorAll('.magnetic').forEach(el=>{
+    if(el._mag) return; el._mag = true
+    el.addEventListener('mousemove', e=>{
+      const r = el.getBoundingClientRect()
+      const x = (e.clientX - r.left - r.width/2) / r.width
+      const y = (e.clientY - r.top - r.height/2) / r.height
+      el.style.transform = `translate(${x*8}px,${y*8}px)`
+    })
+    el.addEventListener('mouseleave', ()=>{ el.style.transform = '' })
+  })
+}
+
+// Toast premium (substitui alert)
+let _toastN = 0
+function toast(msg, type){
+  type = type || 'info'
+  const wrap = document.getElementById('toast-wrap')
+  if(!wrap){ return }
+  const ico = type==='ok'?'✓':type==='err'?'!':'i'
+  const el = document.createElement('div')
+  el.className = 'toast toast-'+type
+  el.innerHTML = '<span class="toast-ico">'+ico+'</span><span>'+msg+'</span>'
+  el.style.pointerEvents='auto'
+  wrap.appendChild(el)
+  requestAnimationFrame(()=>requestAnimationFrame(()=>el.classList.add('show')))
+  const id = ++_toastN
+  setTimeout(()=>{ el.classList.remove('show'); setTimeout(()=>el.remove(), 500) }, 3800)
+  return id
 }
 
 function verifyCREF(){
@@ -2014,6 +2177,7 @@ document.addEventListener('click',function(e){
 })
 
 // INIT
+initSmoothScroll()
 render()
 document.getElementById('footer').style.display = 'block'
 initSession()
