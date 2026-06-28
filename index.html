@@ -879,6 +879,58 @@ function authNotice(msg){
   if(!n){ n = document.createElement('div'); n.className='auth-notice'; n.style.cssText='background:#FEF3C7;color:#92400E;font-size:.8rem;font-weight:600;padding:10px 14px;border-radius:10px;margin-bottom:12px;text-align:center'; modal.querySelector('.mtabs').before(n) }
   n.textContent = msg
 }
+
+// ─── CADASTRO DE PERSONAL ────────────────────────────────────────────────────
+function avancarCadastro(){
+  const c = S.cadastro
+  const step = c.step
+  if(step===1){
+    const err = document.getElementById('cad-err-1')
+    if(!c.nome || !c.nome.trim()){ if(err) err.textContent='Informe seu nome completo.'; return }
+    if(!c.email || !/.+@.+\..+/.test(c.email)){ if(err) err.textContent='Informe um e-mail válido.'; return }
+    if(!c.senha || c.senha.length<6){ if(err) err.textContent='A senha precisa ter no mínimo 6 caracteres.'; return }
+    if(c.senha !== c.senha2){ if(err) err.textContent='As senhas não conferem.'; return }
+  }
+  if(step===2){
+    if(!c.specs || !c.specs.length){ alert('Selecione pelo menos uma especialidade.'); return }
+  }
+  if(step===5){
+    if(!c.plan){ alert('Selecione um plano para continuar.'); return }
+    criarPerfilPersonal()
+    return
+  }
+  S.cadastro.step = step + 1
+  render()
+}
+
+async function criarPerfilPersonal(){
+  const c = S.cadastro
+  const btn = document.getElementById('cad-next-btn')
+  if(btn){ btn.disabled = true; btn.textContent = 'Criando seu perfil...' }
+  try{
+    const { data, error } = await sb.auth.signUp({
+      email: c.email.trim(),
+      password: c.senha,
+      options: { data: {
+        full_name: c.nome.trim(),
+        role: 'trainer',
+        phone: c.telefone || '',
+        bio: c.bio || '',
+        cref: c.cref || '',
+        specialties: c.specs || [],
+        price_per_hour: c.preco || '',
+        city: 'São Paulo'
+      }}
+    })
+    if(error) throw error
+    // Trigger no banco cria profile + trainer automaticamente
+    S.cadastro = { step:1, specs:[], gyms:[], plan:null, radius:10, crefVerified:false }
+    go('cadastro-sucesso')
+  }catch(err){
+    if(btn){ btn.disabled = false; btn.textContent = 'Criar meu perfil →' }
+    alert('Não foi possível criar seu perfil: ' + traduzErroAuth(err.message))
+  }
+}
 document.getElementById('login-modal').addEventListener('click',e=>{ if(e.target===e.currentTarget) closeLogin() })
 document.getElementById('chat-modal').addEventListener('click',e=>{ if(e.target===e.currentTarget) closeChat() })
 
@@ -1670,19 +1722,20 @@ function renderCadastro(){
     ${step===1?`
     <div class="bcard">
       <div class="cad-grid2">
-        <div class="input-group"><label class="input-label">Nome completo</label><input class="input" placeholder="Seu nome" /></div>
-        <div class="input-group"><label class="input-label">CPF</label><input class="input" placeholder="000.000.000-00" /></div>
+        <div class="input-group"><label class="input-label">Nome completo</label><input class="input" placeholder="Seu nome" value="${S.cadastro.nome||''}" oninput="S.cadastro.nome=this.value" /></div>
+        <div class="input-group"><label class="input-label">CPF</label><input class="input" placeholder="000.000.000-00" value="${S.cadastro.cpf||''}" oninput="S.cadastro.cpf=this.value" /></div>
         <div class="input-group">
           <label class="input-label">Telefone <span style="font-size:.7rem;font-weight:400;color:var(--z400)">(uso interno · não exibido para alunos)</span></label>
-          <input class="input" placeholder="(11) 99999-9999" style="font-size:16px" />
+          <input class="input" placeholder="(11) 99999-9999" style="font-size:16px" value="${S.cadastro.telefone||''}" oninput="S.cadastro.telefone=this.value" />
         </div>
-        <div class="input-group"><label class="input-label">Data de nascimento</label><input class="input" type="date" /></div>
+        <div class="input-group"><label class="input-label">Data de nascimento</label><input class="input" type="date" value="${S.cadastro.nascimento||''}" oninput="S.cadastro.nascimento=this.value" /></div>
       </div>
-      <div class="input-group"><label class="input-label">E-mail</label><input class="input" type="email" placeholder="seu@email.com" /></div>
+      <div class="input-group"><label class="input-label">E-mail</label><input class="input" type="email" placeholder="seu@email.com" value="${S.cadastro.email||''}" oninput="S.cadastro.email=this.value" /></div>
       <div class="cad-grid2">
-        <div class="input-group"><label class="input-label">Senha</label><input class="input" type="password" placeholder="Mínimo 8 caracteres" /></div>
-        <div class="input-group"><label class="input-label">Confirmar senha</label><input class="input" type="password" placeholder="Repita a senha" /></div>
+        <div class="input-group"><label class="input-label">Senha</label><input class="input" type="password" placeholder="Mínimo 6 caracteres" value="${S.cadastro.senha||''}" oninput="S.cadastro.senha=this.value" /></div>
+        <div class="input-group"><label class="input-label">Confirmar senha</label><input class="input" type="password" placeholder="Repita a senha" value="${S.cadastro.senha2||''}" oninput="S.cadastro.senha2=this.value" /></div>
       </div>
+      <div id="cad-err-1" style="color:#E63946;font-size:.82rem;font-weight:600;margin-top:6px"></div>
     </div>`:''}
     ${step===2?`
     <div class="bcard">
@@ -1693,7 +1746,7 @@ function renderCadastro(){
       <div class="input-group">
         <label class="input-label">Número CREF</label>
         <div style="display:flex;gap:8px;align-items:flex-start">
-          <input class="input" id="cref-input" placeholder="XXXXXX-X/SP" style="flex:1" oninput="document.getElementById('cref-status').style.display='none'" />
+          <input class="input" id="cref-input" placeholder="XXXXXX-X/SP" style="flex:1" value="${S.cadastro.cref||''}" oninput="S.cadastro.cref=this.value;document.getElementById('cref-status').style.display='none'" />
           <button class="btn btn-outline" style="flex-shrink:0;min-height:44px" onclick="verifyCREF()">Verificar</button>
         </div>
         <div id="cref-status" style="display:none;margin-top:8px">
@@ -1722,7 +1775,7 @@ function renderCadastro(){
           <div class="radius-chip ${S.cadastro.radius===o.v?'on':''}" onclick="S.cadastro.radius=${o.v};render()">${o.l}</div>`).join('')}
         </div>
       </div>
-      <div class="input-group"><label class="input-label">Bio profissional</label><textarea class="input" style="height:120px;resize:vertical" placeholder="Conte sobre sua experiência, metodologia e diferenciais..."></textarea></div>
+      <div class="input-group"><label class="input-label">Bio profissional</label><textarea class="input" style="height:120px;resize:vertical" placeholder="Conte sobre sua experiência, metodologia e diferenciais..." oninput="S.cadastro.bio=this.value">${S.cadastro.bio||''}</textarea></div>
     </div>`:''}
     ${step===3?`
     <div class="bcard">
@@ -1763,7 +1816,7 @@ function renderCadastro(){
         </div>
         <p style="font-size:.75rem;color:#166534;margin:0;line-height:1.5">Personais com preço próximo à média recebem até <strong>3x mais reservas</strong>. Acima de R$250/h, você fica fora dos filtros de preço padrão dos alunos.</p>
       </div>
-      <div class="input-group"><label class="input-label">Seu valor por hora (R$)</label><input class="input" type="number" placeholder="Ex: 120 — próximo da média da região" style="font-size:16px" /></div>
+      <div class="input-group"><label class="input-label">Seu valor por hora (R$)</label><input class="input" type="number" placeholder="Ex: 120 — próximo da média da região" style="font-size:16px" value="${S.cadastro.preco||''}" oninput="S.cadastro.preco=this.value" /></div>
       <div class="input-group">
         <label class="input-label">Planos que você oferece</label>
         ${PLANS.map(p=>`
@@ -1789,9 +1842,27 @@ function renderCadastro(){
     </div>`:''}
     <div style="display:flex;justify-content:space-between;gap:12px;margin-top:8px">
       <button class="btn btn-outline" onclick="${step===1?'go(\'landing\')':'S.cadastro.step='+(step-1)+';render()'}">${step===1?'Cancelar':'← Voltar'}</button>
-      <button class="btn btn-primary btn-lg" onclick="${step===5?'if(!S.cadastro.plan){alert(\'Selecione um plano para continuar\');return}go(\'painel\')':'S.cadastro.step='+(step+1)+';render()'}">${step===5?'Criar meu perfil →':'Continuar →'}</button>
+      <button class="btn btn-primary btn-lg" id="cad-next-btn" onclick="avancarCadastro()">${step===5?'Criar meu perfil →':'Continuar →'}</button>
     </div>
   </div>
+</div>`
+}
+
+function renderCadastroSucesso(){
+  return `
+<div class="container" style="max-width:560px;margin:0 auto;padding:80px 20px;text-align:center">
+  <div style="width:88px;height:88px;border-radius:50%;background:var(--green1);display:flex;align-items:center;justify-content:center;margin:0 auto 28px;font-size:2.6rem">✓</div>
+  <h1 style="font-size:1.9rem;font-weight:900;color:var(--z950);margin-bottom:14px">Perfil criado com sucesso!</h1>
+  <p style="font-size:1.02rem;color:var(--z600);line-height:1.6;margin-bottom:10px">Enviamos um e-mail de confirmação para você. Confirme seu endereço para ativar seu perfil e começar a receber alunos.</p>
+  <div style="background:var(--z50);border:1px solid var(--z200);border-radius:var(--rl);padding:18px;margin:28px 0;text-align:left">
+    <div style="font-size:.82rem;font-weight:800;color:var(--z700);text-transform:uppercase;letter-spacing:.06em;margin-bottom:12px">Próximos passos</div>
+    <div style="display:flex;flex-direction:column;gap:12px">
+      <div style="display:flex;gap:10px;align-items:flex-start"><span style="color:var(--orange);font-weight:900">1.</span><span style="font-size:.92rem;color:var(--z700)">Confirme seu e-mail (verifique também o spam)</span></div>
+      <div style="display:flex;gap:10px;align-items:flex-start"><span style="color:var(--orange);font-weight:900">2.</span><span style="font-size:.92rem;color:var(--z700)">Nossa equipe valida seu CREF junto ao CONFEF (até 24h)</span></div>
+      <div style="display:flex;gap:10px;align-items:flex-start"><span style="color:var(--orange);font-weight:900">3.</span><span style="font-size:.92rem;color:var(--z700)">Seu perfil entra no ar e começa a aparecer nas buscas</span></div>
+    </div>
+  </div>
+  <button class="btn btn-primary btn-lg" onclick="go('landing')">Voltar para o início</button>
 </div>`
 }
 
@@ -1894,6 +1965,7 @@ function render(){
     reservar: renderReservar,
     confirmacao: renderConfirmacao,
     cadastro: renderCadastro,
+    'cadastro-sucesso': renderCadastroSucesso,
     painel: renderPainel,
   }
   main.innerHTML = (screens[S.screen] || renderLanding)()
