@@ -2076,15 +2076,9 @@ async function loadPanel(){
   PANEL.role = role
   try{
     if(role==='admin'){
-      const [pf, tr, gy, bk] = await Promise.all([
-        sb.from('profiles').select('id',{count:'exact',head:true}),
-        sb.from('trainers').select('id',{count:'exact',head:true}).eq('active',true),
-        sb.from('gyms').select('id',{count:'exact',head:true}),
-        sb.from('bookings').select('id',{count:'exact',head:true})
-      ])
-      const recentT = await sb.from('trainers').select('name,city,rating,price_per_hour,verified').order('created_at',{ascending:false}).limit(6)
-      const conv = await sb.from('bookings').select('id',{count:'exact',head:true}).eq('student_confirmed',true)
-      PANEL.d = { users:pf.count||0, trainers:tr.count||0, gyms:gy.count||0, bookings:bk.count||0, conversions:conv.count||0, recentT:recentT.data||[] }
+      const st = await sb.rpc('admin_stats')
+      const allT = await sb.from('trainers').select('*').order('created_at',{ascending:false})
+      PANEL.d = { stats: st.data||{}, allTrainers: allT.data||[] }
     } else if(role==='trainer'){
       const t = await sb.from('trainers').select('*').eq('profile_id',USER.id).maybeSingle()
       let bookings = []
@@ -2092,7 +2086,8 @@ async function loadPanel(){
       PANEL.d = { trainer:t.data, bookings }
     } else {
       const bk = await sb.from('bookings').select('*, trainers(name,avatar_url,neighborhood,whatsapp)').eq('student_id',USER.id).order('session_date',{ascending:false})
-      PANEL.d = { bookings: bk.data||[] }
+      const pg = await sb.from('student_progress').select('*').eq('profile_id',USER.id).maybeSingle()
+      PANEL.d = { bookings: bk.data||[], progress: pg.data||null }
     }
     PANEL.loaded = true
   }catch(err){ PANEL.error = err.message; PANEL.loaded = true }
@@ -2129,10 +2124,52 @@ function renderPainel(){
 
 function statCard(icon,val,lbl){ return '<div class="pstat-card"><div class="pstat-icon">'+icon+'</div><div class="pstat-val">'+val+'</div><div class="pstat-lbl">'+lbl+'</div></div>' }
 
+const GOALS = {
+  emagrecimento: {label:'Emagrecimento', icon:'🔥', perWeek:0.55, unit:'kg', verb:'perder', color:'#E63946'},
+  hipertrofia:   {label:'Hipertrofia',   icon:'💪', perWeek:0.22, unit:'kg de massa', verb:'ganhar', color:'#7C3AED'},
+  condicionamento:{label:'Condicionamento',icon:'⚡', perWeek:3,   unit:'% de resistência', verb:'ganhar', color:'#0284C7'},
+  saude:         {label:'Saúde & bem-estar',icon:'🌿', perWeek:1, unit:'níveis de energia', verb:'evoluir', color:'#059669'}
+}
+async function updateProgress(patch){
+  const cur = PANEL.d.progress||{}
+  const row = Object.assign({ profile_id:USER.id, goal:cur.goal||null, weekly_target:cur.weekly_target||3 }, patch, { updated_at:new Date().toISOString() })
+  try{ await sb.from('student_progress').upsert(row); PANEL.loaded=false; loadPanel() }
+  catch(err){ toast('Erro ao salvar: '+err.message,'err') }
+}
+function setGoal(g){ updateProgress({goal:g}) }
+function setFreq(n){ updateProgress({weekly_target:n}) }
+
+function evolutionSim(pg){
+  const g = GOALS[pg.goal]; const freq = pg.weekly_target||3
+  const factor = freq/3
+  const wk = (n)=> (g.perWeek*factor*n)
+  const fmt = (v)=> g.unit.startsWith('%')||g.unit.startsWith('níveis') ? Math.round(v) : (Math.round(v*10)/10)
+  const milestones = [4,8,12].map(n=>'<div style="flex:1;text-align:center"><div style="font-size:.68rem;color:var(--z500);font-weight:700;text-transform:uppercase;letter-spacing:.05em">'+n+' semanas</div><div style="font-size:1.35rem;font-weight:900;color:'+g.color+';line-height:1.1;margin-top:4px">'+fmt(wk(n))+'</div><div style="font-size:.66rem;color:var(--z500)">'+g.unit+'</div></div>').join('<div style="width:1px;background:var(--z200);align-self:stretch"></div>')
+  const freqBtns = [2,3,4,5].map(n=>'<button onclick="setFreq('+n+')" style="flex:1;padding:8px;border-radius:10px;border:1.5px solid '+(freq===n?g.color:'var(--z200)')+';background:'+(freq===n?g.color:'#fff')+';color:'+(freq===n?'#fff':'var(--z700)')+';font-family:Outfit,sans-serif;font-weight:800;font-size:.85rem;cursor:pointer">'+n+'x</button>').join('')
+  return '<div class="painel-section"><div class="painel-section-title">'+g.icon+' Simulador de evolução · '+g.label+' <button onclick="setGoal(null)" style="margin-left:auto;background:none;border:none;color:var(--z400);font-size:.75rem;cursor:pointer;font-weight:600">trocar objetivo</button></div>'+
+    '<div style="font-size:.82rem;color:var(--z600);margin-bottom:10px">Quantas vezes por semana você quer treinar?</div>'+
+    '<div style="display:flex;gap:8px;margin-bottom:20px">'+freqBtns+'</div>'+
+    '<div style="background:linear-gradient(135deg,'+g.color+'14,'+g.color+'05);border:1px solid '+g.color+'30;border-radius:var(--rl);padding:20px"><div style="font-size:.72rem;font-weight:800;color:'+g.color+';text-transform:uppercase;letter-spacing:.06em;margin-bottom:14px">Sua projeção treinando '+freq+'x/semana</div><div style="display:flex;align-items:flex-start;gap:8px">'+milestones+'</div></div>'+
+    '<div style="margin-top:14px;padding:14px 16px;background:var(--z950);border-radius:var(--rl);display:flex;align-items:center;justify-content:space-between;gap:14px;flex-wrap:wrap"><div style="color:#fff;font-size:.88rem;font-weight:600;flex:1;min-width:180px">🚀 Com um personal, você chega lá <strong style="color:'+g.color+'">até 3x mais rápido</strong> e com segurança.</div><button class="btn btn-primary" onclick="go(\'buscar\')">Contratar personal →</button></div>'+
+  '</div>'
+}
+function goalPicker(){
+  const cards = Object.keys(GOALS).map(k=>{ const g=GOALS[k]; return '<button onclick="setGoal(\''+k+'\')" style="text-align:left;padding:18px;border-radius:var(--rl);border:1.5px solid var(--z200);background:#fff;cursor:pointer;transition:all .15s" onmouseover="this.style.borderColor=\''+g.color+'\';this.style.transform=\'translateY(-2px)\'" onmouseout="this.style.borderColor=\'var(--z200)\';this.style.transform=\'\'"><div style="font-size:1.6rem;margin-bottom:6px">'+g.icon+'</div><div style="font-weight:800;font-size:.95rem;color:var(--z950)">'+g.label+'</div></button>' }).join('')
+  return '<div class="painel-section"><div class="painel-section-title">🎯 Qual é o seu objetivo?</div><div style="font-size:.85rem;color:var(--z600);margin-bottom:16px">Escolha sua meta e veja uma projeção da sua evolução.</div><div style="display:grid;grid-template-columns:repeat(2,1fr);gap:12px">'+cards+'</div></div>'
+}
+
 function renderPainelAluno(first){
   const bks = PANEL.d.bookings||[]
+  const pg = PANEL.d.progress
   const prox = bks.filter(b=>b.status!=='cancelled' && b.status!=='completed')
   const concl = bks.filter(b=>b.status==='completed')
+  const hired = bks.filter(b=>b.student_confirmed===true).length
+  // mensagem motivacional dinâmica
+  let motiv
+  if(!bks.length) motiv = {t:'Bora começar sua transformação! 🚀', s:'Encontre um personal verificado perto de você e marque seu primeiro treino.'}
+  else if(prox.length) motiv = {t:'Você tem treino marcado! 💪', s:'Consistência é o que separa quem sonha de quem chega lá. Mantenha o ritmo.'}
+  else if(hired) motiv = {t:'Que evolução, '+first+'! 🔥', s:'Você já fechou '+hired+' contratação(ões). Que tal manter a constância com um novo ciclo?'}
+  else motiv = {t:'Continue evoluindo! ⚡', s:'Marque seu próximo treino e não perca o ritmo da sua evolução.'}
   const rows = bks.length ? bks.map(b=>{
     const tn = b.trainers?.name || 'Personal'
     const av = b.trainers?.avatar_url || 'https://randomuser.me/api/portraits/lego/1.jpg'
@@ -2142,13 +2179,55 @@ function renderPainelAluno(first){
   }).join('') : '<div style="text-align:center;padding:40px 0;color:var(--z500)"><div style="font-size:2rem;margin-bottom:8px">🗓️</div><p style="margin-bottom:16px">Você ainda não tem agendamentos.</p><button class="btn btn-primary" onclick="go(\'buscar\')">Encontrar um personal →</button></div>'
   return painelHeader('Olá, '+first,'Meu painel',
     '<button class="btn btn-primary" onclick="go(\'buscar\')">Buscar personal</button><button class="btn btn-ghost" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.2)" onclick="logout()">Sair</button>') +
-  '<div class="container" style="padding:28px 0 48px"><div class="painel-stats" style="margin-bottom:24px">'+
+  '<div class="container" style="padding:28px 0 48px">'+
+  '<div style="background:linear-gradient(120deg,#0B0C0F,#1a0a0e);border-radius:var(--rxl);padding:26px 28px;margin-bottom:24px;position:relative;overflow:hidden"><div class="aurora" style="top:-40%;right:-10%;width:300px;height:300px;background:radial-gradient(circle,rgba(230,57,70,.25),transparent 65%)"></div><div style="position:relative"><div style="font-size:1.4rem;font-weight:900;color:#fff;margin-bottom:6px">'+motiv.t+'</div><div style="font-size:.92rem;color:rgba(255,255,255,.6);max-width:520px">'+motiv.s+'</div></div></div>'+
+  '<div class="painel-stats" style="margin-bottom:24px">'+
     statCard('🗓️', bks.length, 'Agendamentos')+
     statCard('⏳', prox.length, 'Próximos')+
     statCard('✅', concl.length, 'Concluídos')+
-    statCard('💪', new Set(bks.map(b=>b.trainer_id)).size, 'Personais')+
-  '</div><div class="painel-section"><div class="painel-section-title">📅 Meus agendamentos</div>'+rows+
-  '</div><div style="background:var(--blue1);border:1px solid #BFDBFE;border-radius:var(--rl);padding:16px 18px;margin-top:16px;display:flex;gap:12px;align-items:flex-start"><span style="font-size:1.1rem">💳</span><p style="font-size:.85rem;color:#1E40AF;margin:0">O pagamento é combinado e feito <strong>diretamente com o personal</strong>. A Personal Prime conecta você ao profissional — sem taxas para o aluno.</p></div></div>'
+    statCard('🏆', hired, 'Contratações')+
+  '</div>'+
+  (pg && pg.goal ? evolutionSim(pg) : goalPicker())+
+  '<div class="painel-section"><div class="painel-section-title">📅 Meus agendamentos</div>'+rows+'</div>'+
+  '<div style="background:var(--blue1);border:1px solid #BFDBFE;border-radius:var(--rl);padding:16px 18px;margin-top:16px;display:flex;gap:12px;align-items:flex-start"><span style="font-size:1.1rem">💳</span><p style="font-size:.85rem;color:#1E40AF;margin:0">O pagamento é combinado e feito <strong>diretamente com o personal</strong>. A Personal Prime conecta você ao profissional — sem taxas para o aluno.</p></div>'+
+  '</div>'
+}
+
+// Análise de qualidade por LÓGICA (heurísticas client-side, zero token/LLM)
+function analyzeTrainer(t){
+  const bio = (t.bio||'').trim()
+  const words = bio ? bio.split(/\s+/).filter(Boolean).length : 0
+  const kw = ['experi','formaç','cref','método','metodo','especialista','especializ','resultado','aluno','treino','ano','certificad','graduad','personal']
+  const kwHits = kw.filter(k=>bio.toLowerCase().includes(k)).length
+  let descScore = words===0 ? 0 : Math.min(100, Math.round((Math.min(words,70)/70)*70) + kwHits*5)
+  const nPhotos = (t.photos||[]).filter(Boolean).length + (t.avatar_url?1:0)
+  let photoScore = Math.min(100, nPhotos*22)
+  const p = Number(t.price_per_hour)||0
+  let priceScore, priceTip
+  if(p===0){ priceScore=0; priceTip='Defina seu valor por hora.' }
+  else if(p>=90 && p<=200){ priceScore=100; priceTip='Preço competitivo — na faixa que mais converte.' }
+  else if(p<90){ priceScore=70; priceTip='Abaixo do mercado: você pode valorizar mais seu trabalho.' }
+  else if(p<=260){ priceScore=75; priceTip='Preço premium — capriche no perfil para justificar.' }
+  else { priceScore=45; priceTip='Acima de R$260/h sai dos filtros da maioria dos alunos.' }
+  let detail=0
+  if(t.specialties){ if(t.specialties.length>=2) detail+=40; else if(t.specialties.length===1) detail+=20 }
+  if(t.cref) detail+=25
+  if(t.whatsapp) detail+=20
+  if(t.neighborhood) detail+=15
+  detail=Math.min(100,detail)
+  const overall = Math.round(descScore*0.30 + photoScore*0.30 + priceScore*0.15 + detail*0.25)
+  return {overall, nPhotos, words, dims:[
+    {k:'Descrição', v:descScore, tip: descScore>=80?'Ótima descrição!':(words<40?'Escreva 60+ palavras citando formação, método e resultados.':'Cite formação, método e resultados para enriquecer.')},
+    {k:'Fotos', v:photoScore, tip: nPhotos>=4?'Boa galeria de fotos!':'Adicione mais fotos treinando (ideal 4-5).'},
+    {k:'Preço', v:priceScore, tip:priceTip},
+    {k:'Detalhamento', v:detail, tip: detail>=80?'Perfil bem detalhado!':'Adicione especialidades, CREF e WhatsApp.'}
+  ]}
+}
+function trainerLevel(n){
+  const levels=[{n:'Iniciante',min:0,c:'#71717A'},{n:'Bronze',min:10,c:'#B45309'},{n:'Prata',min:50,c:'#64748B'},{n:'Ouro',min:150,c:'#D4A017'},{n:'Elite',min:400,c:'#E63946'}]
+  let cur=levels[0], nxt=levels[1]
+  for(let i=0;i<levels.length;i++){ if(n>=levels[i].min){ cur=levels[i]; nxt=levels[i+1]||null } }
+  return {cur,nxt}
 }
 
 function renderPainelTrainer(first){
@@ -2160,29 +2239,74 @@ function renderPainelTrainer(first){
   }
   const pend = bks.filter(b=>b.status==='pending')
   const prox = bks.filter(b=>b.status==='confirmed')
+  const earned = bks.filter(b=>b.status==='confirmed'||b.status==='completed').reduce((a,b)=>a+(Number(b.price_total)||0),0)
+  const alunos = new Set(bks.map(b=>b.student_id)).size
+  const an = analyzeTrainer(t)
+  const lvl = trainerLevel(t.completed_sessions||0)
+  const sc = an.overall
+  const scColor = sc>=80?'#059669':sc>=50?'#D97706':'#E63946'
+  const ativo = sc>=80
+  const ring = '<div style="position:relative;width:104px;height:104px;flex-shrink:0"><svg width="104" height="104" style="transform:rotate(-90deg)"><circle cx="52" cy="52" r="46" fill="none" stroke="var(--z200)" stroke-width="9"/><circle cx="52" cy="52" r="46" fill="none" stroke="'+scColor+'" stroke-width="9" stroke-linecap="round" stroke-dasharray="'+(2*Math.PI*46).toFixed(1)+'" stroke-dashoffset="'+(2*Math.PI*46*(1-sc/100)).toFixed(1)+'"/></svg><div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center"><div style="font-size:1.5rem;font-weight:900;color:'+scColor+';line-height:1">'+sc+'%</div><div style="font-size:.6rem;color:var(--z500);font-weight:700">qualidade</div></div></div>'
+  const bars = an.dims.map(d=>{ const c=d.v>=80?'#059669':d.v>=50?'#D97706':'#E63946'; return '<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:4px"><span style="font-weight:700;color:var(--z800)">'+d.k+'</span><span style="font-weight:800;color:'+c+'">'+d.v+'%</span></div><div style="height:7px;background:var(--z200);border-radius:9999px;overflow:hidden"><div style="height:100%;width:'+d.v+'%;background:'+c+';border-radius:9999px;transition:width .6s"></div></div><div style="font-size:.72rem;color:var(--z500);margin-top:3px">'+d.tip+'</div></div>' }).join('')
+  const gateMsg = ativo
+    ? '<div style="display:inline-flex;align-items:center;gap:6px;background:#D1FAE5;color:#065F46;font-size:.74rem;font-weight:800;padding:5px 12px;border-radius:9999px">● Perfil ativo e sendo exibido nas buscas</div>'
+    : '<div style="display:inline-flex;align-items:center;gap:6px;background:#FEF3C7;color:#92400E;font-size:.74rem;font-weight:800;padding:5px 12px;border-radius:9999px">⚠ Baixa visibilidade — chegue a 80% para ser destacado</div>'
+  const qualityBanner = '<div class="painel-section" style="border:2px solid '+scColor+'30"><div style="display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap"><div style="text-align:center">'+ring+'<div style="margin-top:10px">'+gateMsg+'</div></div><div style="flex:1;min-width:240px"><div style="font-size:1.05rem;font-weight:800;color:var(--z950);margin-bottom:14px">🔍 Raio-x do seu perfil</div>'+bars+(ativo?'':'<button class="btn btn-primary btn-sm" style="margin-top:6px" onclick="go(\'cadastro\')">Melhorar meu perfil →</button>')+'</div></div></div>'
+  const nextLvl = lvl.nxt ? '<div style="font-size:.78rem;color:var(--z500);margin-top:6px">Faltam <strong>'+(lvl.nxt.min-(t.completed_sessions||0))+'</strong> sessões para o nível <strong style="color:'+lvl.nxt.c+'">'+lvl.nxt.n+'</strong></div>' : '<div style="font-size:.78rem;color:var(--z500);margin-top:6px">Nível máximo atingido. Lenda! 🏆</div>'
+  const growthCard = '<div class="painel-section"><div class="painel-section-title">📈 Sua evolução</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px"><div style="background:linear-gradient(135deg,#0B0C0F,#1a0a0e);border-radius:var(--rl);padding:18px;color:#fff"><div style="font-size:.72rem;opacity:.7;text-transform:uppercase;letter-spacing:.06em;font-weight:700">Gerado via Personal Prime</div><div style="font-size:1.8rem;font-weight:900;margin-top:4px">'+fc(earned)+'</div></div><div style="background:linear-gradient(135deg,'+lvl.cur.c+',#0B0C0F);border-radius:var(--rl);padding:18px;color:#fff"><div style="font-size:.72rem;opacity:.85;text-transform:uppercase;letter-spacing:.06em;font-weight:700">Nível atual</div><div style="font-size:1.5rem;font-weight:900;margin-top:4px">'+lvl.cur.n+'</div></div></div>'+nextLvl+'<div style="margin-top:14px;padding:14px 16px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:var(--rl)"><p style="font-size:.85rem;color:#9A3412;margin:0">💡 Perfis <strong>100% completos</strong> e nível Ouro+ recebem até <strong>3x mais solicitações</strong>. Complete seu cadastro e suba de nível!</p></div></div>'
   const sessRows = (prox.length?prox:bks).slice(0,6).map(b=>'<div style="border-bottom:1px solid var(--z100);padding:14px 0"><div style="display:flex;align-items:center;justify-content:space-between"><div class="sess-left"><div class="sess-name">'+b.plan+'</div><div class="sess-meta">'+fmtDate(b.session_date)+' às '+b.session_time+'</div></div>'+statusPill(b.status)+'</div>'+(b.status==='confirmed'||b.status==='completed'?hireBlock(b,'trainer'):'')+'</div>').join('') || '<p style="color:var(--z500);padding:16px 0">Nenhuma sessão agendada ainda.</p>'
   const pendRows = pend.length ? pend.map(b=>'<div class="lead-item"><div class="lead-info"><div class="lead-name">'+b.plan+'</div><div class="lead-meta">'+fmtDate(b.session_date)+' · '+b.session_time+'</div></div><div class="lead-actions"><button class="btn btn-primary btn-sm" onclick="updateBooking(\''+b.id+'\',\'confirmed\')">Aceitar</button><button class="btn btn-ghost btn-sm" onclick="updateBooking(\''+b.id+'\',\'cancelled\')">Recusar</button></div></div>').join('') : '<p style="color:var(--z500);padding:12px 0;font-size:.88rem">Nenhuma solicitação nova.</p>'
   return painelHeader('Olá, '+first,'Painel do Personal',
     '<button class="btn btn-primary" onclick="go(\'cadastro\')">Editar perfil</button><button class="btn btn-ghost" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.2)" onclick="logout()">Sair</button>') +
-  '<div class="container" style="padding:28px 0 48px"><div class="painel-stats" style="margin-bottom:24px">'+
+  '<div class="container" style="padding:28px 0 48px">'+qualityBanner+
+  '<div class="painel-stats" style="margin:24px 0">'+
     statCard('📨', bks.length, 'Solicitações')+
     statCard('✅', bks.filter(b=>b.status==='confirmed').length, 'Confirmadas')+
+    statCard('🧍', alunos, 'Alunos')+
     statCard('⭐', (t.rating||0), 'Avaliação')+
-    statCard('💪', t.completed_sessions||0, 'Sessões')+
-  '</div><div class="painel-grid"><div><div class="painel-section"><div class="painel-section-title">🔥 Solicitações novas '+(pend.length?'<span class="badge badge-orange" style="font-size:.65rem">'+pend.length+' nova(s)</span>':'')+'</div>'+pendRows+'</div><div class="painel-section"><div class="painel-section-title">📅 Próximas sessões</div>'+sessRows+'</div></div><div><div class="painel-section"><div class="painel-section-title">📦 Meu plano</div><div style="background:linear-gradient(135deg,#10B981,#059669);border-radius:var(--rl);padding:18px;color:#fff;margin-bottom:14px"><div style="font-size:.72rem;font-weight:800;opacity:.85;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Plano atual</div><div style="font-size:1.3rem;font-weight:900">Lançamento · Grátis</div><div style="font-size:.76rem;opacity:.85;margin-top:4px">Sem mensalidade durante o lançamento</div></div><p style="font-size:.78rem;color:var(--z500);line-height:1.6">No futuro, planos pagos darão mais visibilidade e destaque nos resultados. Por enquanto, aproveite tudo gratuitamente.</p></div><div class="painel-section"><div class="painel-section-title">👤 Meu perfil</div><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><img src="'+(t.avatar_url||'https://randomuser.me/api/portraits/lego/1.jpg')+'" style="width:48px;height:48px;border-radius:50%;object-fit:cover" /><div><div style="font-weight:700">'+t.name+'</div><div style="font-size:.78rem;color:var(--z500)">'+(t.neighborhood||t.city||'')+'</div></div></div><div style="display:flex;gap:6px;flex-wrap:wrap">'+(t.specialties||[]).map(s=>'<span style="background:var(--z100);color:var(--z600);font-size:.7rem;font-weight:600;padding:3px 9px;border-radius:9999px">'+s+'</span>').join('')+'</div></div></div></div></div>'
+  '</div>'+growthCard+
+  '<div class="painel-grid"><div><div class="painel-section"><div class="painel-section-title">🔥 Solicitações novas '+(pend.length?'<span class="badge badge-orange" style="font-size:.65rem">'+pend.length+' nova(s)</span>':'')+'</div>'+pendRows+'</div><div class="painel-section"><div class="painel-section-title">📅 Próximas sessões</div>'+sessRows+'</div></div><div><div class="painel-section"><div class="painel-section-title">📦 Meu plano</div><div style="background:linear-gradient(135deg,#10B981,#059669);border-radius:var(--rl);padding:18px;color:#fff;margin-bottom:14px"><div style="font-size:.72rem;font-weight:800;opacity:.85;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Plano atual</div><div style="font-size:1.3rem;font-weight:900">Lançamento · Grátis</div><div style="font-size:.76rem;opacity:.85;margin-top:4px">Sem mensalidade durante o lançamento</div></div><p style="font-size:.78rem;color:var(--z500);line-height:1.6">No futuro, planos pagos darão ainda mais visibilidade e destaque. Por enquanto, aproveite tudo gratuitamente.</p></div></div></div></div>'
 }
 
 function renderPainelAdmin(first){
-  const d = PANEL.d
-  const recent = (d.recentT||[]).map(t=>'<div class="session-item"><div class="sess-left"><div class="sess-name">'+t.name+(t.verified?' <span style="color:var(--green);font-size:.7rem">✓</span>':'')+'</div><div class="sess-meta">'+(t.city||'')+' · R$'+(t.price_per_hour||0)+'/h · ⭐'+(t.rating||0)+'</div></div></div>').join('') || '<p style="color:var(--z500)">Nenhum personal ainda.</p>'
-  return painelHeader('Painel Admin','Personal Prime · Master',
+  const s = PANEL.d.stats||{}
+  const all = PANEL.d.allTrainers||[]
+  const convRate = s.bookings ? Math.round((s.conversions/s.bookings)*100) : 0
+  // Cadastros incompletos: score <80 ou não verificado
+  const incompletos = all.map(t=>({t, sc:analyzeTrainer(t).overall})).filter(x=>x.sc<80 || !x.t.verified)
+  const recent = all.slice(0,6).map(t=>{ const sc=analyzeTrainer(t).overall; const c=sc>=80?'#059669':sc>=50?'#D97706':'#E63946'; return '<div class="session-item"><div class="sess-left"><div class="sess-name">'+t.name+(t.verified?' <span style="color:var(--green);font-size:.7rem">✓</span>':'')+'</div><div class="sess-meta">'+(t.city||'')+' · R$'+(t.price_per_hour||0)+'/h · ⭐'+(t.rating||0)+'</div></div><span style="font-size:.78rem;font-weight:800;color:'+c+'">'+sc+'%</span></div>' }).join('') || '<p style="color:var(--z500)">Nenhum personal ainda.</p>'
+  const incRows = incompletos.length ? incompletos.slice(0,12).map(x=>{
+    const t=x.t; const wa=(t.whatsapp||'').replace(/\D/g,'')
+    const remind = wa ? '<a href="https://wa.me/'+wa+'?text='+encodeURIComponent('Olá '+t.name+'! Seu perfil no Personal Prime está '+x.sc+'% completo. Complete para ser exibido aos alunos e receber mais contatos: www.personalprime.com.br')+'" target="_blank" rel="noopener" class="btn btn-sm" style="background:#25D366;color:#fff">Lembrar 📱</a>' : '<span style="font-size:.72rem;color:var(--z400)">sem WhatsApp</span>'
+    return '<div class="lead-item"><div class="lead-info"><div class="lead-name">'+t.name+' <span style="font-size:.72rem;font-weight:800;color:#E63946">'+x.sc+'%</span></div><div class="lead-meta">'+(!t.verified?'CREF não verificado · ':'')+(t.city||'')+'</div></div><div class="lead-actions">'+remind+'</div></div>'
+  }).join('') : '<p style="color:var(--z500);padding:12px 0">Todos os cadastros estão completos! 🎉</p>'
+  return painelHeader('Painel Gerencial','Personal Prime · Master',
     '<button class="btn btn-primary" onclick="go(\'buscar\')">Ver site</button><button class="btn btn-ghost" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.2)" onclick="logout()">Sair</button>') +
-  '<div class="container" style="padding:28px 0 48px"><div class="painel-stats" style="margin-bottom:24px">'+
-    statCard('👥', d.users, 'Usuários')+
-    statCard('💪', d.trainers, 'Personais')+
-    statCard('🏢', d.gyms, 'Academias')+
-    statCard('🗓️', d.bookings, 'Agendamentos')+
-  '</div><div style="background:linear-gradient(135deg,#E63946,#C1121F);border-radius:var(--rl);padding:22px 24px;color:#fff;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px"><div><div style="font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.85">Contratações confirmadas</div><div style="font-size:2.4rem;font-weight:900;line-height:1.1">'+(d.conversions||0)+' <span style="font-size:1rem;font-weight:600;opacity:.85">de '+(d.bookings||0)+' agendamentos</span></div></div><div style="text-align:right"><div style="font-size:.72rem;opacity:.85;text-transform:uppercase;letter-spacing:.06em;font-weight:700">Taxa de conversão</div><div style="font-size:2.4rem;font-weight:900">'+(d.bookings?Math.round((d.conversions/d.bookings)*100):0)+'%</div></div></div><div class="painel-section"><div class="painel-section-title">🆕 Personais recentes</div>'+recent+'</div></div>'
+  '<div class="container" style="padding:28px 0 48px">'+
+  // Bloco de impacto (acessos + conversão)
+  '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">'+
+    '<div style="background:linear-gradient(135deg,#0B0C0F,#1a0a0e);border-radius:var(--rxl);padding:24px;color:#fff;position:relative;overflow:hidden"><div class="aurora" style="top:-30%;right:-10%;width:240px;height:240px;background:radial-gradient(circle,rgba(230,57,70,.25),transparent 65%)"></div><div style="position:relative"><div style="font-size:.72rem;font-weight:800;opacity:.7;text-transform:uppercase;letter-spacing:.06em">Acessos à plataforma</div><div style="font-size:2.6rem;font-weight:900;line-height:1.1">'+(s.views_total||0)+'</div><div style="font-size:.82rem;opacity:.65">'+(s.views_7d||0)+' nos últimos 7 dias</div></div></div>'+
+    '<div style="background:linear-gradient(135deg,#E63946,#C1121F);border-radius:var(--rxl);padding:24px;color:#fff"><div style="font-size:.72rem;font-weight:800;opacity:.85;text-transform:uppercase;letter-spacing:.06em">Contratações confirmadas</div><div style="font-size:2.6rem;font-weight:900;line-height:1.1">'+(s.conversions||0)+'</div><div style="font-size:.82rem;opacity:.85">'+convRate+'% de conversão · '+(s.bookings||0)+' agendamentos</div></div>'+
+  '</div>'+
+  // Stats gerais
+  '<div class="painel-stats" style="margin-bottom:14px">'+
+    statCard('🧍', s.students||0, 'Alunos')+
+    statCard('💪', s.trainers_active||0, 'Personais ativos')+
+    statCard('🏢', s.gyms||0, 'Academias')+
+    statCard('🗓️', s.pending_bookings||0, 'Solicitações pendentes')+
+  '</div>'+
+  '<div class="painel-stats" style="margin-bottom:24px">'+
+    statCard('📋', s.trainers_total||0, 'Cadastros de personal')+
+    statCard('⚠️', s.trainers_unverified||0, 'CREF não verificado')+
+    statCard('🚧', incompletos.length, 'Cadastros incompletos')+
+    statCard('👀', s.views_7d||0, 'Acessos 7 dias')+
+  '</div>'+
+  '<div class="painel-grid">'+
+    '<div class="painel-section"><div class="painel-section-title">🚧 Cadastros incompletos <span class="badge badge-orange" style="font-size:.65rem">'+incompletos.length+'</span></div><p style="font-size:.8rem;color:var(--z500);margin-bottom:10px">Personais abaixo de 80% não são destacados. Envie um lembrete para completarem.</p>'+incRows+'</div>'+
+    '<div class="painel-section"><div class="painel-section-title">🆕 Personais recentes</div>'+recent+'</div>'+
+  '</div>'+
+  '<div style="margin-top:16px;padding:16px 18px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:var(--rl)"><p style="font-size:.85rem;color:#1E40AF;margin:0">💡 <strong>Próximo nível:</strong> os lembretes automáticos (WhatsApp/e-mail para quem não concluiu o cadastro) podem rodar sozinhos via n8n. Por enquanto, use o botão "Lembrar" para enviar manualmente.</p></div>'+
+  '</div>'
 }
 
 async function updateBooking(id, status){
@@ -2365,6 +2489,7 @@ render()
 document.getElementById('footer').style.display = 'block'
 initSession()
 loadTrainers()
+try{ sb.rpc('track_view', { p: location.pathname || '/' }) }catch(e){}
 </script>
 </body>
 </html>
