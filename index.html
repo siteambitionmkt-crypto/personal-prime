@@ -2083,7 +2083,8 @@ async function loadPanel(){
         sb.from('bookings').select('id',{count:'exact',head:true})
       ])
       const recentT = await sb.from('trainers').select('name,city,rating,price_per_hour,verified').order('created_at',{ascending:false}).limit(6)
-      PANEL.d = { users:pf.count||0, trainers:tr.count||0, gyms:gy.count||0, bookings:bk.count||0, recentT:recentT.data||[] }
+      const conv = await sb.from('bookings').select('id',{count:'exact',head:true}).eq('student_confirmed',true)
+      PANEL.d = { users:pf.count||0, trainers:tr.count||0, gyms:gy.count||0, bookings:bk.count||0, conversions:conv.count||0, recentT:recentT.data||[] }
     } else if(role==='trainer'){
       const t = await sb.from('trainers').select('*').eq('profile_id',USER.id).maybeSingle()
       let bookings = []
@@ -2137,7 +2138,7 @@ function renderPainelAluno(first){
     const av = b.trainers?.avatar_url || 'https://randomuser.me/api/portraits/lego/1.jpg'
     const wa = (b.trainers?.whatsapp||'').replace(/\D/g,'')
     const waBtn = wa ? '<a href="https://wa.me/'+wa+'?text='+encodeURIComponent('Olá '+tn+'! Sobre nossa aula agendada pelo Personal Prime ('+b.plan+' · '+fmtDate(b.session_date)+' às '+b.session_time+')')+'" target="_blank" rel="noopener" title="Falar no WhatsApp" style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;background:#25D366;color:#fff;font-size:1rem;flex-shrink:0;text-decoration:none">📱</a>' : ''
-    return '<div class="session-item"><div style="display:flex;align-items:center;gap:12px"><img src="'+av+'" style="width:42px;height:42px;border-radius:50%;object-fit:cover" /><div class="sess-left"><div class="sess-name">'+tn+'</div><div class="sess-meta">'+b.plan+' · '+fmtDate(b.session_date)+' às '+b.session_time+'</div></div></div><div style="display:flex;align-items:center;gap:10px">'+statusPill(b.status)+waBtn+'</div></div>'
+    return '<div style="border-bottom:1px solid var(--z100);padding:14px 0"><div style="display:flex;align-items:center;justify-content:space-between"><div style="display:flex;align-items:center;gap:12px"><img src="'+av+'" style="width:42px;height:42px;border-radius:50%;object-fit:cover" /><div class="sess-left"><div class="sess-name">'+tn+'</div><div class="sess-meta">'+b.plan+' · '+fmtDate(b.session_date)+' às '+b.session_time+'</div></div></div><div style="display:flex;align-items:center;gap:10px">'+statusPill(b.status)+waBtn+'</div></div>'+(b.status!=='cancelled'?hireBlock(b,'student'):'')+'</div>'
   }).join('') : '<div style="text-align:center;padding:40px 0;color:var(--z500)"><div style="font-size:2rem;margin-bottom:8px">🗓️</div><p style="margin-bottom:16px">Você ainda não tem agendamentos.</p><button class="btn btn-primary" onclick="go(\'buscar\')">Encontrar um personal →</button></div>'
   return painelHeader('Olá, '+first,'Meu painel',
     '<button class="btn btn-primary" onclick="go(\'buscar\')">Buscar personal</button><button class="btn btn-ghost" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.2)" onclick="logout()">Sair</button>') +
@@ -2159,7 +2160,7 @@ function renderPainelTrainer(first){
   }
   const pend = bks.filter(b=>b.status==='pending')
   const prox = bks.filter(b=>b.status==='confirmed')
-  const sessRows = (prox.length?prox:bks).slice(0,6).map(b=>'<div class="session-item"><div class="sess-left"><div class="sess-name">'+b.plan+'</div><div class="sess-meta">'+fmtDate(b.session_date)+' às '+b.session_time+'</div></div>'+statusPill(b.status)+'</div>').join('') || '<p style="color:var(--z500);padding:16px 0">Nenhuma sessão agendada ainda.</p>'
+  const sessRows = (prox.length?prox:bks).slice(0,6).map(b=>'<div style="border-bottom:1px solid var(--z100);padding:14px 0"><div style="display:flex;align-items:center;justify-content:space-between"><div class="sess-left"><div class="sess-name">'+b.plan+'</div><div class="sess-meta">'+fmtDate(b.session_date)+' às '+b.session_time+'</div></div>'+statusPill(b.status)+'</div>'+(b.status==='confirmed'||b.status==='completed'?hireBlock(b,'trainer'):'')+'</div>').join('') || '<p style="color:var(--z500);padding:16px 0">Nenhuma sessão agendada ainda.</p>'
   const pendRows = pend.length ? pend.map(b=>'<div class="lead-item"><div class="lead-info"><div class="lead-name">'+b.plan+'</div><div class="lead-meta">'+fmtDate(b.session_date)+' · '+b.session_time+'</div></div><div class="lead-actions"><button class="btn btn-primary btn-sm" onclick="updateBooking(\''+b.id+'\',\'confirmed\')">Aceitar</button><button class="btn btn-ghost btn-sm" onclick="updateBooking(\''+b.id+'\',\'cancelled\')">Recusar</button></div></div>').join('') : '<p style="color:var(--z500);padding:12px 0;font-size:.88rem">Nenhuma solicitação nova.</p>'
   return painelHeader('Olá, '+first,'Painel do Personal',
     '<button class="btn btn-primary" onclick="go(\'cadastro\')">Editar perfil</button><button class="btn btn-ghost" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.2)" onclick="logout()">Sair</button>') +
@@ -2181,7 +2182,7 @@ function renderPainelAdmin(first){
     statCard('💪', d.trainers, 'Personais')+
     statCard('🏢', d.gyms, 'Academias')+
     statCard('🗓️', d.bookings, 'Agendamentos')+
-  '</div><div class="painel-section"><div class="painel-section-title">🆕 Personais recentes</div>'+recent+'</div></div>'
+  '</div><div style="background:linear-gradient(135deg,#E63946,#C1121F);border-radius:var(--rl);padding:22px 24px;color:#fff;margin-bottom:24px;display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:16px"><div><div style="font-size:.72rem;font-weight:800;letter-spacing:.08em;text-transform:uppercase;opacity:.85">Contratações confirmadas</div><div style="font-size:2.4rem;font-weight:900;line-height:1.1">'+(d.conversions||0)+' <span style="font-size:1rem;font-weight:600;opacity:.85">de '+(d.bookings||0)+' agendamentos</span></div></div><div style="text-align:right"><div style="font-size:.72rem;opacity:.85;text-transform:uppercase;letter-spacing:.06em;font-weight:700">Taxa de conversão</div><div style="font-size:2.4rem;font-weight:900">'+(d.bookings?Math.round((d.conversions/d.bookings)*100):0)+'%</div></div></div><div class="painel-section"><div class="painel-section-title">🆕 Personais recentes</div>'+recent+'</div></div>'
 }
 
 async function updateBooking(id, status){
@@ -2190,6 +2191,26 @@ async function updateBooking(id, status){
     toast(status==='confirmed'?'Sessão confirmada!':'Solicitação recusada.', status==='confirmed'?'ok':'info')
     PANEL.loaded = false; loadPanel()
   }catch(err){ toast('Erro ao atualizar: '+err.message,'err') }
+}
+
+// Confirmação de contratação (tracking de conversão do lead)
+async function confirmHire(id, party, val){
+  const patch = {}
+  patch[party==='student'?'student_confirmed':'trainer_confirmed'] = val
+  patch.confirmed_at = new Date().toISOString()
+  try{
+    await sb.from('bookings').update(patch).eq('id', id)
+    toast(val?'Contratação confirmada! Obrigado 🙌':'Resposta registrada.', val?'ok':'info')
+    PANEL.loaded = false; loadPanel()
+  }catch(err){ toast('Erro: '+err.message,'err') }
+}
+// Bloco de confirmação reutilizável (aluno/personal)
+function hireBlock(b, party){
+  const mine = party==='student' ? b.student_confirmed : b.trainer_confirmed
+  const label = party==='student' ? 'A contratação com este personal aconteceu?' : 'Este aluno fechou a contratação com você?'
+  if(mine===true) return '<div style="font-size:.78rem;font-weight:700;color:var(--green);margin-top:8px">✓ Contratação confirmada por você</div>'
+  if(mine===false) return '<div style="font-size:.78rem;font-weight:600;color:var(--z500);margin-top:8px">Você marcou que não houve contratação</div>'
+  return '<div style="margin-top:10px;padding:10px 12px;background:var(--z50);border:1px dashed var(--z300);border-radius:10px"><div style="font-size:.78rem;color:var(--z600);margin-bottom:8px">'+label+'</div><div style="display:flex;gap:8px"><button class="btn btn-primary btn-sm" onclick="confirmHire(\''+b.id+'\',\''+party+'\',true)">Sim, fechamos ✓</button><button class="btn btn-ghost btn-sm" onclick="confirmHire(\''+b.id+'\',\''+party+'\',false)">Não rolou</button></div></div>'
 }
 
 // ─── RENDER ───────────────────────────────────────────────────────────────────
