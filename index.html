@@ -660,7 +660,7 @@ html.lenis,html.lenis body{height:auto}
   <h1>Personal Prime — Encontre seu personal trainer ideal perto de você</h1>
   <p>O Personal Prime é o marketplace que conecta você a personal trainers verificados (CREF) perto de você. Compare preços e horários, veja a agenda em tempo real e reserve sua aula em poucos cliques, sem precisar ligar ou negociar. Especialidades: hipertrofia, emagrecimento, treinamento funcional, crossfit, pilates, yoga, corrida e natação. Personais verificados, pagamento seguro e atendimento nas melhores academias parceiras.</p>
   <h2>Como funciona</h2>
-  <p>Escolha sua região e o raio de atendimento, compare personais por preço, avaliação e disponibilidade, reserve e pague online, e treine no horário marcado.</p>
+  <p>Escolha sua região e o raio de atendimento, compare personais por preço, avaliação e disponibilidade, agende sua aula e combine o pagamento direto com o profissional, e treine no horário marcado.</p>
   <h2>Para personal trainers</h2>
   <p>Cadastre-se gratuitamente, valide seu CREF, defina seu raio de atendimento e receba alunos qualificados todos os dias.</p>
 </div>
@@ -947,6 +947,7 @@ function go(screen, params={}) {
   S.photoIdx = 0
   S.activeTab = 'sobre'
   if(screen==='reservar' && params.trainerId && params.trainerId!==S.booking.trainerId) S.booking = { step:1, plan:null, gym:null, date:null, time:null, trainerId:params.trainerId }
+  if(screen==='painel'){ PANEL = { loading:false, loaded:false, error:null, role:PROFILE?.role||null, d:{} } }
   render()
   if(lenis){ lenis.scrollTo(0,{immediate:true}) } else { window.scrollTo({top:0,behavior:'instant'}) }
   document.getElementById('footer').style.display = screen==='landing' ? 'block' : 'none'
@@ -1057,7 +1058,7 @@ async function finalizarReserva(){
     }catch(err){ console.warn('Falha ao salvar reserva:', err.message) }
   }
   go('confirmacao')
-  toast('Reserva confirmada com sucesso!','ok')
+  toast('Agendamento confirmado com sucesso!','ok')
 }
 function authNotice(msg){
   const modal = document.getElementById('login-modal')
@@ -1239,7 +1240,7 @@ function renderLanding(){
     return '<button onclick="S.search.radius=' + v + ';render()" style="background:' + bg + ';border:1px solid ' + border + ';color:' + color + ';border-radius:9999px;padding:6px 16px;font-family:Outfit,sans-serif;font-size:.78rem;font-weight:700;cursor:pointer;transition:all .15s;outline:none">' + v + 'km</button>'
   }).join('')
   var statsBar =[{n:'850+', l:'Personais ativos'},{n:'120+', l:'Academias parceiras'},{n:'4.9★', l:'Avaliação média'},{n:'15min', l:'Para sua 1ª aula'}].map(function(s){ return '<div><div data-count="' + s.n + '" style="font-size:1.7rem;font-weight:900;color:#fff;line-height:1;font-variant-numeric:tabular-nums">' + s.n + '</div><div style="font-size:.75rem;color:rgba(255,255,255,.82);margin-top:4px;font-weight:500">' + s.l + '</div></div>' }).join('')
-  var howSteps = [{n:'01',icon:'📍',t:'Escolha sua região',d:'Informe o bairro e o raio que você aceita se deslocar. Só aparecem personais que vão até você.'},{n:'02',icon:'📅',t:'Compare preços e agenda',d:'Veja horários disponíveis em tempo real, notas e valores lado a lado. Sem aguardar resposta.'},{n:'03',icon:'💳',t:'Reserve e pague online',d:'Cartão ou Pix. O personal recebe a notificação na hora. Nenhuma mensagem necessária.'},{n:'04',icon:'🏋',t:'Treine sem complicação',d:'Apareça na academia no horário marcado. Qualidade garantida, preço justo, sem enrolação.'}].map(function(s){ return '<div style="text-align:center;padding:0 24px;position:relative"><div style="width:72px;height:72px;border-radius:50%;background:rgba(230,57,70,.1);border:1.5px solid rgba(230,57,70,.3);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;position:relative;z-index:1"><span style="font-size:1.5rem">' + s.icon + '</span></div><div style="font-size:.65rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--orange);margin-bottom:8px">' + s.n + '</div><h4 style="color:#fff;font-size:.95rem;margin-bottom:8px">' + s.t + '</h4><p style="font-size:.8rem;color:rgba(255,255,255,.45);line-height:1.65">' + s.d + '</p></div>' }).join('')
+  var howSteps = [{n:'01',icon:'📍',t:'Escolha sua região',d:'Informe o bairro e o raio que você aceita se deslocar. Só aparecem personais que vão até você.'},{n:'02',icon:'📅',t:'Compare preços e agenda',d:'Veja horários disponíveis em tempo real, notas e valores lado a lado. Sem aguardar resposta.'},{n:'03',icon:'✅',t:'Agende em segundos',d:'Escolha o horário e confirme. O personal recebe a notificação na hora e combina o pagamento direto com você.'},{n:'04',icon:'🏋',t:'Treine sem complicação',d:'Apareça na academia no horário marcado. Qualidade garantida, preço justo, sem enrolação.'}].map(function(s){ return '<div style="text-align:center;padding:0 24px;position:relative"><div style="width:72px;height:72px;border-radius:50%;background:rgba(230,57,70,.1);border:1.5px solid rgba(230,57,70,.3);display:flex;align-items:center;justify-content:center;margin:0 auto 20px;position:relative;z-index:1"><span style="font-size:1.5rem">' + s.icon + '</span></div><div style="font-size:.65rem;font-weight:900;letter-spacing:.12em;text-transform:uppercase;color:var(--orange);margin-bottom:8px">' + s.n + '</div><h4 style="color:#fff;font-size:.95rem;margin-bottom:8px">' + s.t + '</h4><p style="font-size:.8rem;color:rgba(255,255,255,.45);line-height:1.65">' + s.d + '</p></div>' }).join('')
   var skyStats = [{n:'3',l:'Unidades'},{n:'40+',l:'Personais ativos'},{n:'500+',l:'Alunos atendidos'}].map(function(s){ return '<div style="text-align:center"><div style="color:#E8B84B;font-size:1.4rem;font-weight:900">' + s.n + '</div><div style="color:rgba(255,255,255,.45);font-size:.72rem;margin-top:2px">' + s.l + '</div></div>' }).join('')
   var planCards = [{name:'Starter',price:97,leads:'15 leads/mês',features:['Perfil verificado','Agenda online','Raio até 10km','Suporte básico'],pop:false},{name:'Profissional',price:197,leads:'40 leads/mês',features:['Destaque nos resultados','Agenda + notificações','Raio ilimitado','Suporte prioritário','Relatório mensal'],pop:true,tag:'Mais popular'},{name:'Premium',price:297,leads:'Leads ilimitados',features:['Topo de resultados','Badge verificado premium','Suporte VIP 24h','Analytics avançado'],pop:false},{name:'Enterprise',price:497,leads:'Múltiplos perfis',features:['Tudo do Premium','Gerente dedicado','Integração CRM','Treinamento da equipe'],pop:false}].map(function(p){ var feats=p.features.map(function(f){ return '<div style="font-size:.82rem;color:' + (p.pop?'rgba(255,255,255,.9)':'rgba(255,255,255,.6)') + ';display:flex;align-items:center;gap:7px"><span style="color:' + (p.pop?'#fff':'var(--green)') + ';font-weight:900;font-size:.75rem">&#x2713;</span>' + f + '</div>' }).join(''); var tagHtml = p.tag ? '<div style="position:absolute;top:-12px;left:50%;transform:translateX(-50%);background:#fff;color:var(--orange-6);font-size:.65rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;padding:4px 14px;border-radius:9999px;white-space:nowrap">' + p.tag + '</div>' : ''; return '<div style="background:' + (p.pop?'var(--orange)':'rgba(255,255,255,.05)') + ';border:1px solid ' + (p.pop?'var(--orange)':'rgba(255,255,255,.1)') + ';border-radius:20px;padding:28px 22px;position:relative">' + tagHtml + '<div style="font-size:.72rem;font-weight:800;letter-spacing:.09em;text-transform:uppercase;color:' + (p.pop?'rgba(255,255,255,.7)':'rgba(255,255,255,.4)') + ';margin-bottom:12px">' + p.name + '</div><div style="font-size:2.2rem;font-weight:900;color:#fff;line-height:1">R$ ' + p.price + '</div><div style="font-size:.78rem;color:' + (p.pop?'rgba(255,255,255,.6)':'rgba(255,255,255,.35)') + ';margin-bottom:22px">/mês · ' + p.leads + '</div><div style="display:flex;flex-direction:column;gap:8px;margin-bottom:22px">' + feats + '</div><button onclick="go(\'cadastro\')" style="width:100%;background:' + (p.pop?'#fff':'rgba(255,255,255,.1)') + ';color:' + (p.pop?'var(--orange-6)':'#fff') + ';border:none;border-radius:10px;padding:12px;font-family:Outfit,sans-serif;font-size:.88rem;font-weight:700;cursor:pointer">' + (p.pop?'Começar agora →':'Escolher plano') + '</button></div>' }).join('')
   var testimonials = TESTIMONIALS.map(function(t){ return '<div style="background:var(--ink3);border:1px solid var(--hair);border-radius:20px;padding:28px"><div style="color:#F5A623;font-size:.95rem;margin-bottom:14px;letter-spacing:2px">★★★★★</div><p style="font-size:.92rem;line-height:1.75;color:var(--on-dark);margin-bottom:20px">&ldquo;' + t.text + '&rdquo;</p><div style="display:flex;align-items:center;gap:12px"><img src="' + t.avatar + '" style="width:44px;height:44px;border-radius:50%;object-fit:cover;border:2px solid var(--hair2)" alt="' + t.name + '" /><div><div style="font-weight:700;font-size:.88rem;color:#fff">' + t.name + '</div><div style="font-size:.75rem;color:var(--on-dark-3);margin-top:2px">' + t.role + '</div></div></div></div>' }).join('')
@@ -1628,7 +1629,7 @@ function renderPerfil(){
         </div>
         <button class="btn btn-primary btn-full btn-lg" onclick="go('reservar',{trainerId:'${t.id}'})">Reservar agora →</button>
         <button onclick="openChat('${t.id}')" style="width:100%;background:var(--z100);color:var(--z700);border:1.5px solid var(--z200);border-radius:var(--r);padding:12px;font-family:Outfit,sans-serif;font-size:.9rem;font-weight:700;cursor:pointer;margin-top:10px;transition:all .15s;min-height:44px" onmouseover="this.style.background='var(--z200)'" onmouseout="this.style.background='var(--z100)'">💬 Fazer uma pergunta</button>
-        <p style="text-align:center;font-size:.72rem;color:var(--z400);margin-top:10px;line-height:1.5">🔒 Pagamento seguro · Sem troca de contato fora da plataforma</p>
+        <p style="text-align:center;font-size:.72rem;color:var(--z400);margin-top:10px;line-height:1.5">✓ CREF verificado · Pagamento combinado direto com o personal</p>
       </div>
     </div>
   </div>
@@ -1847,27 +1848,25 @@ function renderReservar(){
 
     ${step===4?`
     <div class="bcard">
-      <div class="bcard-title">Confirmar e pagar</div>
+      <div class="bcard-title">Confirmar agendamento</div>
       <div class="bsummary">
         <div class="bsum-row"><span>Personal</span><strong>${t.name}</strong></div>
         <div class="bsum-row"><span>Plano</span><strong>${selectedPlan?.name}</strong></div>
         <div class="bsum-row"><span>Academia</span><strong>${selectedGym?.name}</strong></div>
         <div class="bsum-row"><span>Data e hora</span><strong>${new Date(S.booking.date+'T00:00:00').toLocaleDateString('pt-BR')} às ${S.booking.time}</strong></div>
-        <div class="bsum-row"><span>Total</span><strong style="color:var(--orange)">${selectedPlan?fc(planPrice(t,selectedPlan)):'-'}</strong></div>
+        <div class="bsum-row"><span>Valor combinado</span><strong style="color:var(--orange)">${selectedPlan?fc(planPrice(t,selectedPlan)):'-'}</strong></div>
       </div>
-      <h4 style="margin-bottom:16px">Dados do cartão</h4>
-      <div>
-        <div class="input-group"><label class="input-label">Nome no cartão</label><input class="input" placeholder="Como aparece no cartão" /></div>
-        <div class="input-group"><label class="input-label">Número do cartão</label><input class="input" placeholder="0000 0000 0000 0000" /></div>
-        <div class="pay-grid">
-          <div class="input-group"><label class="input-label">Validade</label><input class="input" placeholder="MM/AA" /></div>
-          <div class="input-group"><label class="input-label">CVV</label><input class="input" placeholder="123" /></div>
+      <div style="background:var(--blue1);border:1px solid #BFDBFE;border-radius:var(--rl);padding:16px 18px;margin-top:18px;display:flex;gap:12px;align-items:flex-start">
+        <span style="font-size:1.2rem">💳</span>
+        <div>
+          <div style="font-weight:800;font-size:.9rem;color:#1E40AF;margin-bottom:3px">Pagamento direto com o personal</div>
+          <p style="font-size:.83rem;color:#1E40AF;margin:0;line-height:1.55">Você combina a forma de pagamento (Pix, dinheiro ou cartão) diretamente com o profissional. A Personal Prime não cobra nenhuma taxa do aluno — só conectamos você ao personal certo.</p>
         </div>
       </div>
     </div>
     <div class="bnav">
       <button class="btn btn-outline" onclick="S.booking.step=3;render()">← Voltar</button>
-      <button class="btn btn-primary btn-lg" onclick="finalizarReserva()">Finalizar e pagar →</button>
+      <button class="btn btn-primary btn-lg" onclick="finalizarReserva()">Confirmar agendamento →</button>
     </div>`:''}
   </div>
 </div>`
@@ -1880,14 +1879,14 @@ function renderConfirmacao(){
   return `
 <div class="confirm-wrap">
   <div class="confirm-icon">✓</div>
-  <h2 style="margin-bottom:8px">Reserva confirmada!</h2>
-  <p>Você receberá uma confirmação no seu e-mail. ${t.name} foi notificado e te espera na academia.</p>
+  <h2 style="margin-bottom:8px">Agendamento confirmado!</h2>
+  <p>${t.name} foi notificado e vai combinar com você os detalhes e a forma de pagamento. Você também recebe tudo no seu painel.</p>
   <div class="confirm-card">
     <div class="confirm-row"><span style="color:var(--z500)">Personal</span><strong>${t.name}</strong></div>
     <div class="confirm-row"><span style="color:var(--z500)">Academia</span><strong>${gym?.name||'-'}</strong></div>
     <div class="confirm-row"><span style="color:var(--z500)">Plano</span><strong>${plan?.name||'-'}</strong></div>
     <div class="confirm-row"><span style="color:var(--z500)">Data e hora</span><strong>${new Date(S.booking.date+'T00:00:00').toLocaleDateString('pt-BR')} às ${S.booking.time}</strong></div>
-    <div class="confirm-row"><span>Total pago</span><strong style="color:var(--orange)">${plan?fc(planPrice(t,plan)):'-'}</strong></div>
+    <div class="confirm-row"><span>Valor combinado</span><strong style="color:var(--orange)">${plan?fc(planPrice(t,plan)):'-'}</strong></div>
   </div>
   <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
     <button class="btn btn-primary btn-lg" onclick="go('painel')">Ver minha conta</button>
@@ -2056,91 +2055,127 @@ function renderCadastroSucesso(){
 </div>`
 }
 
+let PANEL = { loading:false, loaded:false, error:null, role:null, d:{} }
+async function loadPanel(){
+  if(!USER){ PANEL = { loading:false, loaded:true, role:null, d:{} }; return }
+  if(!PROFILE){ await loadProfile() }
+  PANEL.loading = true; PANEL.error = null
+  const role = PROFILE?.role || 'student'
+  PANEL.role = role
+  try{
+    if(role==='admin'){
+      const [pf, tr, gy, bk] = await Promise.all([
+        sb.from('profiles').select('id',{count:'exact',head:true}),
+        sb.from('trainers').select('id',{count:'exact',head:true}).eq('active',true),
+        sb.from('gyms').select('id',{count:'exact',head:true}),
+        sb.from('bookings').select('id',{count:'exact',head:true})
+      ])
+      const recentT = await sb.from('trainers').select('name,city,rating,price_per_hour,verified').order('created_at',{ascending:false}).limit(6)
+      PANEL.d = { users:pf.count||0, trainers:tr.count||0, gyms:gy.count||0, bookings:bk.count||0, recentT:recentT.data||[] }
+    } else if(role==='trainer'){
+      const t = await sb.from('trainers').select('*').eq('profile_id',USER.id).maybeSingle()
+      let bookings = []
+      if(t.data){ const bk = await sb.from('bookings').select('*').eq('trainer_id',t.data.id).order('session_date',{ascending:true}); bookings = bk.data||[] }
+      PANEL.d = { trainer:t.data, bookings }
+    } else {
+      const bk = await sb.from('bookings').select('*, trainers(name,avatar_url,neighborhood)').eq('student_id',USER.id).order('session_date',{ascending:false})
+      PANEL.d = { bookings: bk.data||[] }
+    }
+    PANEL.loaded = true
+  }catch(err){ PANEL.error = err.message; PANEL.loaded = true }
+  PANEL.loading = false
+  if(S.screen==='painel') render()
+}
+
+function fmtDate(d){ try{ return new Date(d+'T00:00:00').toLocaleDateString('pt-BR') }catch(e){ return d } }
+function statusPill(st){
+  const map = { pending:['Pendente','#B45309','#FEF3C7'], confirmed:['Confirmado','#065F46','#D1FAE5'], completed:['Concluído','#3F3F46','#E4E4E7'], cancelled:['Cancelado','#991B1B','#FEE2E2'] }
+  const m = map[st]||map.pending
+  return '<span style="font-size:.7rem;font-weight:800;padding:4px 10px;border-radius:9999px;color:'+m[1]+';background:'+m[2]+'">'+m[0]+'</span>'
+}
+
+function painelHeader(title, sub, actions){
+  return '<div class="painel-hdr"><div class="container painel-hdr-in"><div><div class="painel-greet">'+sub+'</div><div class="painel-name">'+title+'</div></div><div style="display:flex;gap:10px">'+(actions||'')+'</div></div></div>'
+}
+
 function renderPainel(){
-  return `
-<div class="painel-hdr">
-  <div class="container painel-hdr-in">
-    <div>
-      <div class="painel-greet">Bem-vindo de volta</div>
-      <div class="painel-name">Rodrigo Silva</div>
-    </div>
-    <div style="display:flex;gap:10px">
-      <button class="btn btn-ghost" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.2)" onclick="go('perfil',{id:'t1'})">Ver meu perfil</button>
-      <button class="btn btn-primary">Editar perfil</button>
-    </div>
-  </div>
-</div>
-<div class="container" style="padding-top:28px;padding-bottom:40px">
-  <div class="painel-stats">
-    <div class="pstat-card"><div class="pstat-icon">📨</div><div class="pstat-val">12</div><div class="pstat-lbl">Leads este mês</div></div>
-    <div class="pstat-card"><div class="pstat-icon">💪</div><div class="pstat-val">48</div><div class="pstat-lbl">Sessões realizadas</div></div>
-    <div class="pstat-card"><div class="pstat-icon">⭐</div><div class="pstat-val">4.9</div><div class="pstat-lbl">Avaliação média</div></div>
-    <div class="pstat-card"><div class="pstat-icon">💰</div><div class="pstat-val">R$ 3.840</div><div class="pstat-lbl">Receita do mês</div></div>
-  </div>
-  <div class="painel-grid">
-    <div>
-      <div class="painel-section">
-        <div class="painel-section-title">📅 Próximas sessões</div>
-        ${[
-          {name:'Ana Paula',meta:'SmartFit Moema · Segunda 07:00',status:'conf',statusTxt:'Confirmado'},
-          {name:'João Carlos',meta:'Skyfit Santa Isabel · Terça 08:00',status:'conf',statusTxt:'Confirmado'},
-          {name:'Mariana Silva',meta:'SmartFit Moema · Quarta 18:00',status:'pend',statusTxt:'Pendente'},
-          {name:'Felipe Costa',meta:'Skyfit Santa Isabel · Quinta 07:00',status:'conf',statusTxt:'Confirmado'},
-        ].map(s=>`
-        <div class="session-item">
-          <div class="sess-left">
-            <div class="sess-name">${s.name}</div>
-            <div class="sess-meta">${s.meta}</div>
-          </div>
-          <span class="sess-status ${s.status}">${s.statusTxt}</span>
-        </div>`).join('')}
-      </div>
-      <div class="painel-section">
-        <div class="painel-section-title">🔥 Solicitações novas <span class="badge badge-orange" style="font-size:.65rem">3 novas</span></div>
-        ${[
-          {name:'Carlos Mendes',meta:'Emagrecimento · Moema',avatar:'https://picsum.photos/seed/cm/80/80'},
-          {name:'Bianca Torres',meta:'Hipertrofia · Itaim Bibi',avatar:'https://picsum.photos/seed/bt/80/80'},
-          {name:'Rafael Nunes',meta:'Crossfit · Santa Isabel',avatar:'https://picsum.photos/seed/rn/80/80'},
-        ].map(l=>`
-        <div class="lead-item">
-          <img class="lead-avatar" src="${l.avatar}" alt="${l.name}" />
-          <div class="lead-info">
-            <div class="lead-name">${l.name}</div>
-            <div class="lead-meta">${l.meta}</div>
-          </div>
-          <div class="lead-actions">
-            <button class="btn btn-primary btn-sm">Aceitar</button>
-            <button class="btn btn-ghost btn-sm">Recusar</button>
-          </div>
-        </div>`).join('')}
-      </div>
-    </div>
-    <div>
-      <div class="painel-section">
-        <div class="painel-section-title">📦 Meu plano</div>
-        <div style="background:var(--orange);border-radius:var(--rl);padding:18px;color:var(--white);margin-bottom:14px">
-          <div style="font-size:.75rem;font-weight:700;opacity:.8;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Plano atual</div>
-          <div style="font-size:1.3rem;font-weight:900">Profissional</div>
-          <div style="font-size:.78rem;opacity:.8;margin-top:4px">Renova em 26/07/2026</div>
-        </div>
-        <button class="btn btn-outline btn-full btn-sm">Fazer upgrade</button>
-      </div>
-      <div class="painel-section">
-        <div class="painel-section-title">📊 Desempenho</div>
-        ${[
-          {lbl:'Taxa de resposta',val:'94%',ok:true},
-          {lbl:'Taxa de aceitação',val:'78%',ok:true},
-          {lbl:'Perfil visto',val:'234×',ok:null},
-          {lbl:'Favoritos',val:'18',ok:null},
-        ].map(m=>`
-        <div style="display:flex;justify-content:space-between;padding:9px 0;font-size:.85rem;border-bottom:1px solid var(--z100)">
-          <span style="color:var(--z600)">${m.lbl}</span>
-          <strong style="color:${m.ok===true?'var(--green)':m.ok===false?'var(--red)':'var(--z950)'}">${m.val}</strong>
-        </div>`).join('')}
-      </div>
-    </div>
-  </div>
-</div>`
+  if(!USER){
+    return painelHeader('Acesso à conta','Painel') +
+    '<div class="container" style="padding:60px 0;text-align:center"><div style="max-width:420px;margin:0 auto"><div style="font-size:2.4rem;margin-bottom:12px">🔒</div><h3 style="margin-bottom:10px">Entre para ver seu painel</h3><p style="color:var(--z600);margin-bottom:24px">Acesse sua conta para acompanhar seus agendamentos e seu perfil.</p><button class="btn btn-primary btn-lg" onclick="openLogin()">Entrar na minha conta</button></div></div>'
+  }
+  if(!PANEL.loaded){
+    if(!PANEL.loading) loadPanel()
+    const sk = '<div class="skeleton" style="height:96px"></div>'
+    return painelHeader('Carregando...','Painel') + '<div class="container" style="padding:28px 0 40px"><div style="display:grid;grid-template-columns:repeat(4,1fr);gap:14px;margin-bottom:20px">'+sk+sk+sk+sk+'</div><div class="skeleton" style="height:220px"></div></div>'
+  }
+  const first = (PROFILE?.full_name||'você').split(' ')[0]
+  if(PANEL.role==='admin') return renderPainelAdmin(first)
+  if(PANEL.role==='trainer') return renderPainelTrainer(first)
+  return renderPainelAluno(first)
+}
+
+function statCard(icon,val,lbl){ return '<div class="pstat-card"><div class="pstat-icon">'+icon+'</div><div class="pstat-val">'+val+'</div><div class="pstat-lbl">'+lbl+'</div></div>' }
+
+function renderPainelAluno(first){
+  const bks = PANEL.d.bookings||[]
+  const prox = bks.filter(b=>b.status!=='cancelled' && b.status!=='completed')
+  const concl = bks.filter(b=>b.status==='completed')
+  const rows = bks.length ? bks.map(b=>{
+    const tn = b.trainers?.name || 'Personal'
+    const av = b.trainers?.avatar_url || 'https://randomuser.me/api/portraits/lego/1.jpg'
+    return '<div class="session-item"><div style="display:flex;align-items:center;gap:12px"><img src="'+av+'" style="width:42px;height:42px;border-radius:50%;object-fit:cover" /><div class="sess-left"><div class="sess-name">'+tn+'</div><div class="sess-meta">'+b.plan+' · '+fmtDate(b.session_date)+' às '+b.session_time+'</div></div></div>'+statusPill(b.status)+'</div>'
+  }).join('') : '<div style="text-align:center;padding:40px 0;color:var(--z500)"><div style="font-size:2rem;margin-bottom:8px">🗓️</div><p style="margin-bottom:16px">Você ainda não tem agendamentos.</p><button class="btn btn-primary" onclick="go(\'buscar\')">Encontrar um personal →</button></div>'
+  return painelHeader('Olá, '+first,'Meu painel',
+    '<button class="btn btn-primary" onclick="go(\'buscar\')">Buscar personal</button><button class="btn btn-ghost" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.2)" onclick="logout()">Sair</button>') +
+  '<div class="container" style="padding:28px 0 48px"><div class="painel-stats" style="margin-bottom:24px">'+
+    statCard('🗓️', bks.length, 'Agendamentos')+
+    statCard('⏳', prox.length, 'Próximos')+
+    statCard('✅', concl.length, 'Concluídos')+
+    statCard('💪', new Set(bks.map(b=>b.trainer_id)).size, 'Personais')+
+  '</div><div class="painel-section"><div class="painel-section-title">📅 Meus agendamentos</div>'+rows+
+  '</div><div style="background:var(--blue1);border:1px solid #BFDBFE;border-radius:var(--rl);padding:16px 18px;margin-top:16px;display:flex;gap:12px;align-items:flex-start"><span style="font-size:1.1rem">💳</span><p style="font-size:.85rem;color:#1E40AF;margin:0">O pagamento é combinado e feito <strong>diretamente com o personal</strong>. A Personal Prime conecta você ao profissional — sem taxas para o aluno.</p></div></div>'
+}
+
+function renderPainelTrainer(first){
+  const t = PANEL.d.trainer
+  const bks = PANEL.d.bookings||[]
+  if(!t){
+    return painelHeader('Olá, '+first,'Painel do Personal','<button class="btn btn-ghost" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.2)" onclick="logout()">Sair</button>') +
+    '<div class="container" style="padding:48px 0;text-align:center"><div style="max-width:440px;margin:0 auto"><div style="font-size:2.2rem;margin-bottom:10px">⏳</div><h3 style="margin-bottom:10px">Seu perfil está em análise</h3><p style="color:var(--z600)">Estamos validando seu CREF. Assim que aprovado, seu perfil entra no ar e você começa a receber alunos.</p></div></div>'
+  }
+  const pend = bks.filter(b=>b.status==='pending')
+  const prox = bks.filter(b=>b.status==='confirmed')
+  const sessRows = (prox.length?prox:bks).slice(0,6).map(b=>'<div class="session-item"><div class="sess-left"><div class="sess-name">'+b.plan+'</div><div class="sess-meta">'+fmtDate(b.session_date)+' às '+b.session_time+'</div></div>'+statusPill(b.status)+'</div>').join('') || '<p style="color:var(--z500);padding:16px 0">Nenhuma sessão agendada ainda.</p>'
+  const pendRows = pend.length ? pend.map(b=>'<div class="lead-item"><div class="lead-info"><div class="lead-name">'+b.plan+'</div><div class="lead-meta">'+fmtDate(b.session_date)+' · '+b.session_time+'</div></div><div class="lead-actions"><button class="btn btn-primary btn-sm" onclick="updateBooking(\''+b.id+'\',\'confirmed\')">Aceitar</button><button class="btn btn-ghost btn-sm" onclick="updateBooking(\''+b.id+'\',\'cancelled\')">Recusar</button></div></div>').join('') : '<p style="color:var(--z500);padding:12px 0;font-size:.88rem">Nenhuma solicitação nova.</p>'
+  return painelHeader('Olá, '+first,'Painel do Personal',
+    '<button class="btn btn-primary" onclick="go(\'cadastro\')">Editar perfil</button><button class="btn btn-ghost" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.2)" onclick="logout()">Sair</button>') +
+  '<div class="container" style="padding:28px 0 48px"><div class="painel-stats" style="margin-bottom:24px">'+
+    statCard('📨', bks.length, 'Solicitações')+
+    statCard('✅', bks.filter(b=>b.status==='confirmed').length, 'Confirmadas')+
+    statCard('⭐', (t.rating||0), 'Avaliação')+
+    statCard('💪', t.completed_sessions||0, 'Sessões')+
+  '</div><div class="painel-grid"><div><div class="painel-section"><div class="painel-section-title">🔥 Solicitações novas '+(pend.length?'<span class="badge badge-orange" style="font-size:.65rem">'+pend.length+' nova(s)</span>':'')+'</div>'+pendRows+'</div><div class="painel-section"><div class="painel-section-title">📅 Próximas sessões</div>'+sessRows+'</div></div><div><div class="painel-section"><div class="painel-section-title">📦 Meu plano</div><div style="background:linear-gradient(135deg,#10B981,#059669);border-radius:var(--rl);padding:18px;color:#fff;margin-bottom:14px"><div style="font-size:.72rem;font-weight:800;opacity:.85;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Plano atual</div><div style="font-size:1.3rem;font-weight:900">Lançamento · Grátis</div><div style="font-size:.76rem;opacity:.85;margin-top:4px">Sem mensalidade durante o lançamento</div></div><p style="font-size:.78rem;color:var(--z500);line-height:1.6">No futuro, planos pagos darão mais visibilidade e destaque nos resultados. Por enquanto, aproveite tudo gratuitamente.</p></div><div class="painel-section"><div class="painel-section-title">👤 Meu perfil</div><div style="display:flex;align-items:center;gap:12px;margin-bottom:12px"><img src="'+(t.avatar_url||'https://randomuser.me/api/portraits/lego/1.jpg')+'" style="width:48px;height:48px;border-radius:50%;object-fit:cover" /><div><div style="font-weight:700">'+t.name+'</div><div style="font-size:.78rem;color:var(--z500)">'+(t.neighborhood||t.city||'')+'</div></div></div><div style="display:flex;gap:6px;flex-wrap:wrap">'+(t.specialties||[]).map(s=>'<span style="background:var(--z100);color:var(--z600);font-size:.7rem;font-weight:600;padding:3px 9px;border-radius:9999px">'+s+'</span>').join('')+'</div></div></div></div></div>'
+}
+
+function renderPainelAdmin(first){
+  const d = PANEL.d
+  const recent = (d.recentT||[]).map(t=>'<div class="session-item"><div class="sess-left"><div class="sess-name">'+t.name+(t.verified?' <span style="color:var(--green);font-size:.7rem">✓</span>':'')+'</div><div class="sess-meta">'+(t.city||'')+' · R$'+(t.price_per_hour||0)+'/h · ⭐'+(t.rating||0)+'</div></div></div>').join('') || '<p style="color:var(--z500)">Nenhum personal ainda.</p>'
+  return painelHeader('Painel Admin','Personal Prime · Master',
+    '<button class="btn btn-primary" onclick="go(\'buscar\')">Ver site</button><button class="btn btn-ghost" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.2)" onclick="logout()">Sair</button>') +
+  '<div class="container" style="padding:28px 0 48px"><div class="painel-stats" style="margin-bottom:24px">'+
+    statCard('👥', d.users, 'Usuários')+
+    statCard('💪', d.trainers, 'Personais')+
+    statCard('🏢', d.gyms, 'Academias')+
+    statCard('🗓️', d.bookings, 'Agendamentos')+
+  '</div><div class="painel-section"><div class="painel-section-title">🆕 Personais recentes</div>'+recent+'</div></div>'
+}
+
+async function updateBooking(id, status){
+  try{
+    await sb.from('bookings').update({ status }).eq('id', id)
+    toast(status==='confirmed'?'Sessão confirmada!':'Solicitação recusada.', status==='confirmed'?'ok':'info')
+    PANEL.loaded = false; loadPanel()
+  }catch(err){ toast('Erro ao atualizar: '+err.message,'err') }
 }
 
 // ─── RENDER ───────────────────────────────────────────────────────────────────
