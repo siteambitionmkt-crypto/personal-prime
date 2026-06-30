@@ -984,6 +984,7 @@ function go(screen, params={}) {
   S.activeTab = 'sobre'
   if(screen==='reservar' && params.trainerId && params.trainerId!==S.booking.trainerId) S.booking = { step:1, plan:null, gym:null, date:null, time:null, trainerId:params.trainerId }
   if(screen==='painel'){ PANEL = { loading:false, loaded:false, error:null, role:PROFILE?.role||null, d:{} } }
+  if(screen==='buscar' || screen==='landing'){ loadTrainers() } // recarrega p/ refletir novos cadastros
   render()
   animateScreen()
   if(lenis){ lenis.scrollTo(0,{immediate:true}) } else { window.scrollTo({top:0,behavior:'instant'}) }
