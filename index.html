@@ -574,17 +574,43 @@ select.input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xml
 .ticker-inner{display:inline-flex;animation:ticker-scroll 28s linear infinite;white-space:nowrap}
 .ticker-inner:hover{animation-play-state:paused}
 
-/* MOBILE FIRST IMPROVEMENTS */
-@media(max-width:480px){
-  .hero-in{padding:80px 0 50px!important}
-  .nav-actions .btn:not(.btn-primary){display:none}
-  [style*="grid-template-columns:repeat(4"]{grid-template-columns:repeat(2,1fr)!important}
-  [style*="grid-template-columns:repeat(3"]{grid-template-columns:1fr!important}
-  [style*="font-size:clamp(2.6rem"]{font-size:2.1rem!important}
-}
 @media(max-width:768px){
   .plan-plat-grid{grid-template-columns:1fr 1fr!important}
   .cad-grid2{grid-template-columns:1fr!important}
+}
+/* ═══════════ MOBILE-FIRST (99% dos acessos são celular) ═══════════ */
+@media(max-width:640px){
+  /* Nav: manter LOGIN sempre visível; esconder CTA secundário e menu */
+  .nav-links{display:none}
+  #nav .nav-actions > .btn-primary{display:none}
+  #nav-auth-btn{display:inline-flex!important}
+  .nav-in{height:60px;padding:0 16px}
+  .logo-icon{width:32px;height:32px}
+  /* Hero grid inline → 1 coluna */
+  [style*="grid-template-columns:1.05fr 1fr"]{grid-template-columns:1fr!important;gap:32px!important}
+  /* Header dos painéis empilha */
+  .painel-hdr-in{flex-direction:column;align-items:flex-start;gap:14px}
+  .painel-hdr-in > div:last-child{width:100%;display:flex;gap:8px}
+  .painel-hdr-in .btn{flex:1}
+  /* Seções escuras com menos padding */
+  section[style*="padding:88px"],section[style*="padding:80px"]{padding-top:52px!important;padding-bottom:52px!important}
+}
+@media(max-width:480px){
+  .hero-in{padding:80px 0 50px!important}
+  /* Grids inline colapsam */
+  [style*="grid-template-columns:repeat(4"]{grid-template-columns:repeat(2,1fr)!important}
+  [style*="grid-template-columns:repeat(3"]{grid-template-columns:1fr!important}
+  [style*="grid-template-columns:1fr 1fr"]{grid-template-columns:1fr!important}
+  [style*="font-size:clamp(2.6rem"]{font-size:2.1rem!important}
+  .painel-stats{grid-template-columns:1fr 1fr!important;gap:10px}
+  .pstat-card{padding:14px!important}
+  .pstat-val{font-size:1.4rem!important}
+  /* Toasts ocupam largura util */
+  #toast-wrap{left:12px;right:12px;top:74px}
+  .toast{max-width:none}
+  /* Texto e títulos um pouco menores */
+  h1{font-size:clamp(1.9rem,7vw,2.6rem)!important}
+  .painel-section{padding:18px!important}
 }
 
 /* ═══════════ MOTION & SURREAL LAYER ═══════════ */
@@ -2365,9 +2391,23 @@ let lenis = null
 function initSmoothScroll(){
   if(lenis || typeof Lenis==='undefined') return
   lenis = new Lenis({ duration:1.1, easing:t=>Math.min(1,1.001-Math.pow(2,-10*t)), smoothWheel:true })
-  function raf(time){ lenis.raf(time); requestAnimationFrame(raf) }
+  // RAF: NÃO roda quando a aba está oculta (evita acúmulo de delta → salto ao voltar)
+  function raf(time){
+    if(!document.hidden){ lenis.raf(time) }
+    requestAnimationFrame(raf)
+  }
   requestAnimationFrame(raf)
   if(typeof ScrollTrigger!=='undefined'){ lenis.on('scroll', ScrollTrigger.update) }
+  // Ao sair/voltar da aba ou janela: trava a posição atual sem animar (corrige o "salto")
+  function freezeScroll(){
+    if(!lenis) return
+    var y = (typeof lenis.actualScroll==='number') ? lenis.actualScroll : window.scrollY
+    lenis.scrollTo(y, { immediate:true, force:true })
+    if(typeof ScrollTrigger!=='undefined') ScrollTrigger.update()
+  }
+  document.addEventListener('visibilitychange', function(){ if(!document.hidden) requestAnimationFrame(freezeScroll) })
+  window.addEventListener('focus', function(){ requestAnimationFrame(freezeScroll) })
+  window.addEventListener('pageshow', function(){ requestAnimationFrame(freezeScroll) })
 }
 
 function initMotion(){
