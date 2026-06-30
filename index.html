@@ -2072,8 +2072,8 @@ function renderCadastro(){
       </div>
       <div class="input-group"><label class="input-label">E-mail</label><input class="input" type="email" placeholder="seu@email.com" value="${S.cadastro.email||''}" oninput="S.cadastro.email=this.value" /></div>
       <div class="cad-grid2">
-        <div class="input-group"><label class="input-label">Senha</label><input class="input" type="password" placeholder="Mínimo 6 caracteres" value="${S.cadastro.senha||''}" oninput="S.cadastro.senha=this.value" /></div>
-        <div class="input-group"><label class="input-label">Confirmar senha</label><input class="input" type="password" placeholder="Repita a senha" value="${S.cadastro.senha2||''}" oninput="S.cadastro.senha2=this.value" /></div>
+        <div class="input-group"><label class="input-label">Senha</label><div class="pass-wrap"><input class="input" type="password" placeholder="Mínimo 6 caracteres" value="${S.cadastro.senha||''}" oninput="S.cadastro.senha=this.value" /><button type="button" class="pass-eye" onclick="togglePass(this)" aria-label="Ver senha">👁</button></div></div>
+        <div class="input-group"><label class="input-label">Confirmar senha</label><div class="pass-wrap"><input class="input" type="password" placeholder="Repita a senha" value="${S.cadastro.senha2||''}" oninput="S.cadastro.senha2=this.value" /><button type="button" class="pass-eye" onclick="togglePass(this)" aria-label="Ver senha">👁</button></div></div>
       </div>
       <div id="cad-err-1" style="color:#E63946;font-size:.82rem;font-weight:600;margin-top:6px"></div>
     </div>`:''}
