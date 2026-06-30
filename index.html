@@ -974,7 +974,7 @@ const S = {
   activeTab: 'sobre',
   booking: { step:1, plan:null, gym:null, date:null, time:null },
   search: { query:'', specialty:'Todos', priceMax:null, sortBy:'rating', radius:10, resolvedLocation:null },
-  cadastro: { step:1, specs:[], gyms:[], plan:null, radius:10, crefVerified:false },
+  cadastro: { step:1, specs:[], gyms:[], academias:[], plan:null, radius:10, crefVerified:false },
 }
 
 function go(screen, params={}) {
@@ -1110,6 +1110,64 @@ function gerarBio(){
   toast('Bio otimizada! Edite como quiser. ✨','ok')
 }
 
+// ─── BUSCA DE ACADEMIAS (Google Places + fallback no banco) ───
+let ACAD_RESULTS = []
+function cleanCity(q){ return (q||'').toLowerCase().replace(/academias?|em|na|no|de|da|do|perto|regi[ãa]o/g,' ').replace(/\s+/g,' ').trim() }
+async function buscarAcademias(){
+  const q = (S.cadastro.acadQ||'').trim()
+  const box = document.getElementById('acad-results')
+  if(!q){ toast('Digite a cidade ou o nome da academia.','info'); return }
+  if(box) box.innerHTML = '<div class="skeleton" style="height:64px;margin-bottom:8px"></div><div class="skeleton" style="height:64px"></div>'
+  let results = []
+  try{
+    const r = await fetch('/api/places?q='+encodeURIComponent(q))
+    const d = await r.json()
+    results = d.results || []
+  }catch(e){ /* sem internet/serverless */ }
+  if(!results.length){
+    // fallback: academias já no banco, por cidade
+    const city = cleanCity(q)
+    try{
+      let qb = sb.from('gyms').select('name,address,neighborhood,city,rating,reviews,phone,hours').eq('active',true)
+      if(city) qb = qb.or('city.ilike.%'+city+'%,neighborhood.ilike.%'+city+'%,name.ilike.%'+q+'%')
+      const { data } = await qb.order('reviews',{ascending:false}).limit(20)
+      results = (data||[]).map(g=>({ name:g.name, address:(g.address?g.address+' · ':'')+(g.neighborhood||g.city||''), rating:g.rating?Number(g.rating):null, reviews:g.reviews||0, phone:g.phone||'', hours:g.hours||'' }))
+    }catch(e){}
+  }
+  ACAD_RESULTS = results
+  if(box) box.innerHTML = renderAcadResults()
+}
+function renderAcadResults(){
+  if(!ACAD_RESULTS.length) return '<div style="text-align:center;padding:24px;color:var(--z500)"><p style="margin-bottom:6px">Nenhuma academia encontrada.</p><p style="font-size:.8rem">Tente outra cidade ou o nome exato. Você também pode digitar manualmente abaixo.</p><button type="button" class="btn btn-outline btn-sm" style="margin-top:10px" onclick="acadAddManual()">+ Adicionar manualmente</button></div>'
+  return ACAD_RESULTS.map(function(a,i){
+    const sel = (S.cadastro.academias||[]).some(x=>x.name===a.name)
+    const stars = a.rating ? '<span style="color:#F59E0B;font-weight:800">★ '+a.rating+'</span> <span style="color:var(--z400);font-size:.75rem">('+(a.reviews||0)+')</span>' : '<span style="font-size:.72rem;color:var(--z400)">sem nota</span>'
+    return '<div onclick="acadToggle('+i+')" style="display:flex;align-items:center;gap:12px;padding:12px 14px;border:1.5px solid '+(sel?'var(--orange)':'var(--z200)')+';border-radius:var(--rl);margin-bottom:8px;cursor:pointer;background:'+(sel?'var(--orange-05)':'#fff')+'"><div style="width:24px;height:24px;border-radius:6px;border:2px solid '+(sel?'var(--orange)':'var(--z300)')+';background:'+(sel?'var(--orange)':'#fff')+';color:#fff;display:flex;align-items:center;justify-content:center;flex-shrink:0;font-size:.8rem;font-weight:900">'+(sel?'✓':'')+'</div><div style="flex:1;min-width:0"><div style="font-weight:700;font-size:.9rem">'+a.name+'</div><div style="font-size:.76rem;color:var(--z500);white-space:nowrap;overflow:hidden;text-overflow:ellipsis">'+stars+' · '+(a.address||'')+(a.phone?' · '+a.phone:'')+'</div></div></div>'
+  }).join('')
+}
+function acadToggle(i){
+  const a = ACAD_RESULTS[i]; if(!a) return
+  S.cadastro.academias = S.cadastro.academias || []
+  const idx = S.cadastro.academias.findIndex(x=>x.name===a.name)
+  if(idx>=0) S.cadastro.academias.splice(idx,1); else S.cadastro.academias.push(a)
+  const box = document.getElementById('acad-results'); if(box) box.innerHTML = renderAcadResults()
+  const sb2 = document.getElementById('acad-selected'); if(sb2) sb2.innerHTML = renderAcadSelected()
+}
+function acadAddManual(){
+  const nome = prompt('Nome da academia:'); if(!nome) return
+  const cidade = prompt('Cidade / bairro:') || ''
+  S.cadastro.academias = S.cadastro.academias || []
+  S.cadastro.academias.push({ name:nome.trim(), address:cidade.trim(), rating:null, reviews:0, phone:'' })
+  const sb2 = document.getElementById('acad-selected'); if(sb2) sb2.innerHTML = renderAcadSelected()
+  toast('Academia adicionada.','ok')
+}
+function acadRemove(i){ (S.cadastro.academias||[]).splice(i,1); const sb2=document.getElementById('acad-selected'); if(sb2) sb2.innerHTML=renderAcadSelected(); const box=document.getElementById('acad-results'); if(box) box.innerHTML=renderAcadResults() }
+function renderAcadSelected(){
+  const list = S.cadastro.academias || []
+  if(!list.length) return '<div style="font-size:.8rem;color:var(--z400)">Nenhuma academia selecionada ainda.</div>'
+  return '<div style="font-size:.74rem;font-weight:800;color:var(--z600);text-transform:uppercase;letter-spacing:.05em;margin-bottom:8px">Selecionadas ('+list.length+')</div>'+list.map(function(a,i){ return '<div style="display:inline-flex;align-items:center;gap:6px;background:var(--orange-05);border:1px solid var(--orange-1);color:var(--orange-6);border-radius:9999px;padding:6px 12px;font-size:.82rem;font-weight:600;margin:0 6px 6px 0">'+a.name+' <span onclick="acadRemove('+i+')" style="cursor:pointer;font-weight:900;opacity:.6">✕</span></div>' }).join('')
+}
+
 const isUUID = v => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v||'')
 async function finalizarReserva(){
   // Exige login para reservar
@@ -1183,12 +1241,14 @@ async function criarPerfilPersonal(){
         cref: c.cref || '',
         specialties: c.specs || [],
         price_per_hour: c.preco || '',
-        city: 'São Paulo'
+        academias: (c.academias||[]).slice(0,15).map(a=>({ name:a.name, address:a.address||'', rating:a.rating||null, reviews:a.reviews||0, phone:a.phone||'' })),
+        neighborhood: ((c.academias||[])[0]?.address || cleanCity(c.acadQ||'') || '').split('·').pop().trim().slice(0,60),
+        city: (cleanCity(c.acadQ||'').replace(/\b\w/g, m=>m.toUpperCase())) || 'São Paulo'
       }}
     })
     if(error) throw error
     // Trigger no banco cria profile + trainer automaticamente
-    S.cadastro = { step:1, specs:[], gyms:[], plan:null, radius:10, crefVerified:false }
+    S.cadastro = { step:1, specs:[], gyms:[], academias:[], plan:null, radius:10, crefVerified:false }
     go('cadastro-sucesso')
   }catch(err){
     if(btn){ btn.disabled = false; btn.textContent = 'Criar meu perfil →' }
@@ -2064,16 +2124,14 @@ function renderCadastro(){
     </div>`:''}
     ${step===3?`
     <div class="bcard">
-      <p style="margin-bottom:18px;font-size:.9rem">Selecione as academias onde você vai atender seus alunos:</p>
-      ${GYMS.map(g=>`
-      <div class="gym-check ${S.cadastro.gyms.includes(g.id)?'on':''}" onclick="S.cadastro.gyms.includes('${g.id}')?S.cadastro.gyms.splice(S.cadastro.gyms.indexOf('${g.id}'),1):S.cadastro.gyms.push('${g.id}');render()">
-        <input type="checkbox" ${S.cadastro.gyms.includes(g.id)?'checked':''} onclick="event.stopPropagation()" />
-        <div class="gym-check-info">
-          <div class="gym-check-name">${g.name} ${g.isSkyfit?'⭐ Parceiro Skyfit':''}</div>
-          <div class="gym-check-addr">${g.address} · ${g.neighborhood}</div>
-        </div>
-      </div>`).join('')}
-      <p style="font-size:.78rem;color:var(--z500);margin-top:12px">Não encontrou sua academia? <a style="color:var(--orange);cursor:pointer">Solicitar cadastro →</a></p>
+      <p style="margin-bottom:6px;font-size:.9rem;font-weight:600">Em quais academias você atende?</p>
+      <p style="margin-bottom:14px;font-size:.82rem;color:var(--z500)">Busque pela sua cidade e região (ex: "academias em Santa Isabel"). Puxamos as academias reais com nota e avaliações.</p>
+      <div style="display:flex;gap:8px">
+        <input id="acad-q" class="input" placeholder="Ex: academias em Santa Isabel" value="${S.cadastro.acadQ||''}" oninput="S.cadastro.acadQ=this.value" onkeydown="if(event.key==='Enter'){event.preventDefault();buscarAcademias()}" />
+        <button type="button" class="btn btn-primary" onclick="buscarAcademias()" style="flex-shrink:0">Buscar</button>
+      </div>
+      <div id="acad-results" style="margin-top:14px"></div>
+      <div id="acad-selected" style="margin-top:16px;padding-top:14px;border-top:1px solid var(--z100)">${renderAcadSelected()}</div>
     </div>`:''}
     ${step===4?`
     <div class="bcard">
