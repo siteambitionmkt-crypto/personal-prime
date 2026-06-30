@@ -1,0 +1,13 @@
+{
+  "name": "Personal Prime",
+  "short_name": "Personal Prime",
+  "description": "Encontre seu personal trainer ideal perto de você.",
+  "start_url": "/",
+  "display": "standalone",
+  "background_color": "#0B0C0F",
+  "theme_color": "#0B0C0F",
+  "lang": "pt-BR",
+  "icons": [
+    { "src": "/og-image.png", "sizes": "1200x630", "type": "image/png", "purpose": "any" }
+  ]
+}
