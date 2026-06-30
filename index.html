@@ -499,6 +499,12 @@ select.input{appearance:none;background-image:url("data:image/svg+xml,%3Csvg xml
 .mform.hidden{display:none}
 .modal-pt{text-align:center;margin-top:18px;font-size:.82rem;color:var(--z600)}
 .modal-pt a{color:var(--orange);font-weight:700;cursor:pointer}
+.pass-wrap{position:relative}
+.pass-wrap .input{padding-right:46px}
+.pass-eye{position:absolute;right:6px;top:50%;transform:translateY(-50%);background:none;border:none;cursor:pointer;font-size:1.1rem;opacity:.5;padding:8px;line-height:1;min-height:auto}
+.pass-eye:hover{opacity:.9}
+.mform-link{text-align:center;margin-top:14px;font-size:.84rem;color:var(--z600)}
+.mform-link a{color:var(--orange);font-weight:700;cursor:pointer}
 
 /* CONFIRMATION */
 .confirm-wrap{max-width:560px;margin:0 auto;padding:60px 24px;text-align:center}
@@ -818,14 +824,17 @@ html.lenis,html.lenis body{height:auto}
     </div>
     <form class="mform" id="mf-login" onsubmit="handleLogin(event)">
       <div class="input-group"><input class="input" type="email" placeholder="E-mail" required/></div>
-      <div class="input-group"><input class="input" type="password" placeholder="Senha" required/></div>
+      <div class="input-group"><div class="pass-wrap"><input class="input" type="password" placeholder="Senha" required/><button type="button" class="pass-eye" onclick="togglePass(this)" aria-label="Ver senha">👁</button></div></div>
+      <div style="text-align:right;margin:-4px 0 12px"><a onclick="forgotPassword('mf-login')" style="font-size:.8rem;color:var(--orange);font-weight:600;cursor:pointer">Esqueci minha senha</a></div>
       <button class="btn btn-primary btn-full">Entrar</button>
+      <p class="mform-link">Não tem conta? <a onclick="switchTab('register')">Criar conta grátis</a></p>
     </form>
     <form class="mform hidden" id="mf-register" onsubmit="handleLogin(event)">
       <div class="input-group"><input class="input" type="text" placeholder="Nome completo" required/></div>
       <div class="input-group"><input class="input" type="email" placeholder="E-mail" required/></div>
-      <div class="input-group"><input class="input" type="password" placeholder="Senha" required/></div>
+      <div class="input-group"><div class="pass-wrap"><input class="input" type="password" placeholder="Senha (mín. 6 caracteres)" required/><button type="button" class="pass-eye" onclick="togglePass(this)" aria-label="Ver senha">👁</button></div></div>
       <button class="btn btn-primary btn-full">Criar Conta</button>
+      <p class="mform-link">Já tem conta? <a onclick="switchTab('login')">Entrar</a></p>
     </form>
     <p class="modal-pt">Sou Personal Trainer — <a onclick="closeLogin();go('cadastro')">cadastrar como profissional</a></p>
   </div>
@@ -976,6 +985,7 @@ function go(screen, params={}) {
   if(screen==='reservar' && params.trainerId && params.trainerId!==S.booking.trainerId) S.booking = { step:1, plan:null, gym:null, date:null, time:null, trainerId:params.trainerId }
   if(screen==='painel'){ PANEL = { loading:false, loaded:false, error:null, role:PROFILE?.role||null, d:{} } }
   render()
+  animateScreen()
   if(lenis){ lenis.scrollTo(0,{immediate:true}) } else { window.scrollTo({top:0,behavior:'instant'}) }
   document.getElementById('footer').style.display = screen==='landing' ? 'block' : 'none'
 }
@@ -1060,6 +1070,45 @@ function traduzErroAuth(m){
   return m
 }
 async function logout(){ await sb.auth.signOut(); go('landing'); toast('Você saiu da sua conta.','info') }
+
+function togglePass(btn){
+  var inp = btn.parentElement.querySelector('input')
+  if(!inp) return
+  if(inp.type==='password'){ inp.type='text'; btn.textContent='🙈' }
+  else { inp.type='password'; btn.textContent='👁' }
+}
+async function forgotPassword(formId){
+  var form = document.getElementById(formId)
+  var emailInp = form ? form.querySelector('input[type=email]') : null
+  var email = emailInp ? emailInp.value.trim() : ''
+  if(!email || !/.+@.+\..+/.test(email)){ toast('Digite seu e-mail no campo acima primeiro.','info'); if(emailInp) emailInp.focus(); return }
+  try{
+    await sb.auth.resetPasswordForEmail(email, { redirectTo: location.origin })
+    toast('Se houver conta com esse e-mail, enviamos um link para redefinir a senha.','ok')
+  }catch(err){ toast('Erro: '+traduzErroAuth(err.message),'err') }
+}
+
+// Gerador de bio — copywriter por LÓGICA (zero token). Monta texto persuasivo a partir das especialidades.
+function gerarBio(){
+  const c = S.cadastro
+  const specs = c.specs || []
+  if(!specs.length){ toast('Selecione suas especialidades no passo anterior primeiro.','info'); return }
+  const methods = {
+    'Hipertrofia':'periodização inteligente e sobrecarga progressiva','Emagrecimento':'treinos metabólicos e acompanhamento de cada evolução',
+    'Funcional':'movimentos funcionais que melhoram sua força no dia a dia','Crossfit':'alta intensidade com técnica e segurança',
+    'Yoga':'consciência corporal, respiração e mobilidade','Pilates':'fortalecimento do core, postura e controle',
+    'Corrida':'planilhas progressivas e prevenção de lesões','Natação':'técnica de nado e ganho de resistência'
+  }
+  const espTxt = specs.length===1 ? specs[0].toLowerCase() : specs.slice(0,-1).map(s=>s.toLowerCase()).join(', ')+' e '+specs[specs.length-1].toLowerCase()
+  const method = specs.map(s=>methods[s]).filter(Boolean)[0] || 'um método personalizado para o seu objetivo'
+  const bio = 'Especialista em '+espTxt+', ajudo meus alunos a alcançarem resultados consistentes com '+method+'. '+
+    'Monto cada treino de acordo com o seu nível, sua rotina e a sua meta — do primeiro passo à alta performance. '+
+    'Você terá acompanhamento próximo, evolução medida de perto e o foco que faltava para manter a constância. '+
+    'Bora treinar junto e fazer o seu resultado acontecer?'
+  S.cadastro.bio = bio
+  render()
+  toast('Bio otimizada! Edite como quiser. ✨','ok')
+}
 
 const isUUID = v => /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i.test(v||'')
 async function finalizarReserva(){
@@ -2002,7 +2051,12 @@ function renderCadastro(){
           <div class="radius-chip ${S.cadastro.radius===o.v?'on':''}" onclick="S.cadastro.radius=${o.v};render()">${o.l}</div>`).join('')}
         </div>
       </div>
-      <div class="input-group"><label class="input-label">Bio profissional</label><textarea class="input" style="height:120px;resize:vertical" placeholder="Conte sobre sua experiência, metodologia e diferenciais..." oninput="S.cadastro.bio=this.value">${S.cadastro.bio||''}</textarea></div>
+      <div class="input-group"><label class="input-label">Bio profissional</label><textarea class="input" style="height:130px;resize:vertical" placeholder="Conte sobre sua experiência, metodologia e diferenciais..." oninput="S.cadastro.bio=this.value">${S.cadastro.bio||''}</textarea>
+        <div style="display:flex;justify-content:space-between;align-items:center;gap:10px;margin-top:6px;flex-wrap:wrap">
+          <span style="font-size:.74rem;color:var(--z500);flex:1;min-width:180px">💡 Cite sua formação, método e os resultados que você gera. 60+ palavras posicionam melhor.</span>
+          <button type="button" class="btn btn-outline btn-sm" onclick="gerarBio()" style="white-space:nowrap">✨ Otimizar com IA</button>
+        </div>
+      </div>
     </div>`:''}
     ${step===3?`
     <div class="bcard">
@@ -2380,9 +2434,13 @@ function render(){
   }
   main.innerHTML = (screens[S.screen] || renderLanding)()
   footer.style.display = S.screen==='landing' ? 'block' : 'none'
-  // transição de tela
+  // NÃO anima aqui — atualizações dentro da mesma tela (toggles, sliders) não devem
+  // replayar a entrada. A animação/efeitos ficam no go() (troca de tela).
+}
+// Anima a entrada da tela + (re)inicia a camada de movimento. Só no go().
+function animateScreen(){
+  const main = document.getElementById('main')
   main.classList.remove('page-anim'); void main.offsetWidth; main.classList.add('page-anim')
-  // (re)inicia a camada de movimento — síncrono p/ evitar flash de 1 frame
   initMotion()
 }
 
@@ -2507,11 +2565,14 @@ function verifyCREF(){
     btn.textContent = 'Verificar'
     btn.disabled = false
     statusDiv.style.display = 'block'
-    const valid = /\d{6}-\w\/[A-Z]{2}/.test(val) || val.length >= 8
+    // Valida o FORMATO oficial do CONFEF: NNNNNN-G/UF (G=Graduado, P=Provisionado)
+    const UFS = 'AC AL AP AM BA CE DF ES GO MA MT MS MG PA PB PR PE PI RJ RN RS RO RR SC SP SE TO'.split(' ')
+    const m = val.toUpperCase().match(/^0*(\d{1,6})-?([GP])\/([A-Z]{2})$/)
+    const valid = !!m && UFS.indexOf(m[3]) !== -1
     okDiv.style.display = valid ? 'flex' : 'none'
     errDiv.style.display = valid ? 'none' : 'flex'
     S.cadastro.crefVerified = valid
-  }, 1400)
+  }, 900)
 }
 
 function toggleAccessMenu(){
@@ -2526,6 +2587,7 @@ document.addEventListener('click',function(e){
 // INIT
 initSmoothScroll()
 render()
+animateScreen()
 document.getElementById('footer').style.display = 'block'
 initSession()
 loadTrainers()
