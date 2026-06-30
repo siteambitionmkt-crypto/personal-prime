@@ -1760,25 +1760,29 @@ function reservarPlanSel(t){
   }).join('')
 }
 
+const FREE_PLAN = 'Teste Grátis · 30 dias'
 function cadastroPlanCards(){
-  var plans = [
-    {name:'Starter',price:97,per:'mês',features:['15 leads/mês','Perfil verificado','Suporte básico'],popular:false},
-    {name:'Profissional',price:197,per:'mês',features:['40 leads/mês','Destaque na busca','Suporte prioritário','Relatório mensal'],popular:true,tag:'Recomendado'},
-    {name:'Premium',price:297,per:'mês',features:['Leads ilimitados','Topo dos resultados','Suporte VIP 24h','Badge premium'],popular:false},
-    {name:'Enterprise',price:497,per:'mês',features:['Múltiplos perfis','Gerente dedicado','Integração CRM'],popular:false},
-  ]
-  return plans.map(function(p){
-    var tag = p.tag ? '<div class="plan-plat-tag">' + p.tag + '</div>' : ''
-    var feats = p.features.map(function(f){ return '<div style="font-size:.82rem;color:var(--z600);display:flex;align-items:center;gap:6px;margin-bottom:6px"><span style="color:var(--green);font-weight:900;font-size:.75rem">&#x2713;</span>' + f + '</div>' }).join('')
-    var cls = 'plan-plat' + (S.cadastro.plan===p.name ? ' on' : '') + (p.popular ? ' popular-plat' : '')
-    return '<div class="' + cls + '" onclick="S.cadastro.plan=\'' + p.name + '\';render()">' +
-      tag +
-      '<div class="plan-plat-name">' + p.name + '</div>' +
-      '<div class="plan-plat-price">R$ ' + p.price + '</div>' +
-      '<div class="plan-plat-per">/' + p.per + '</div>' +
-      feats +
-    '</div>'
+  if(S.cadastro.plan===null) S.cadastro.plan = FREE_PLAN
+  // Plano gratuito de 30 dias em destaque (selecionado por padrão)
+  var freeOn = S.cadastro.plan===FREE_PLAN
+  var freeFeats = ['Perfil completo e verificado','Apareça nas buscas da sua região','Receba solicitações de alunos','Agenda e WhatsApp integrados','Sem cartão · sem compromisso']
+    .map(function(f){ return '<div style="font-size:.85rem;color:rgba(255,255,255,.92);display:flex;align-items:center;gap:8px;margin-bottom:8px"><span style="color:#fff;font-weight:900">✓</span>'+f+'</div>' }).join('')
+  var free = '<div onclick="S.cadastro.plan=\''+FREE_PLAN+'\';render()" style="grid-column:1/-1;cursor:pointer;background:linear-gradient(135deg,#E63946,#C1121F);border:2px solid '+(freeOn?'#fff':'transparent')+';border-radius:var(--rxl);padding:26px;color:#fff;position:relative;box-shadow:'+(freeOn?'0 12px 36px rgba(230,57,70,.35)':'none')+'">'+
+    '<div style="position:absolute;top:16px;right:16px;background:#fff;color:#C1121F;font-size:.65rem;font-weight:900;letter-spacing:.06em;text-transform:uppercase;padding:5px 12px;border-radius:9999px">'+(freeOn?'● Selecionado':'Recomendado')+'</div>'+
+    '<div style="font-size:.72rem;font-weight:800;opacity:.85;letter-spacing:.08em;text-transform:uppercase;margin-bottom:6px">Lançamento</div>'+
+    '<div style="font-size:1.5rem;font-weight:900;margin-bottom:2px">Teste Grátis</div>'+
+    '<div style="display:flex;align-items:baseline;gap:6px;margin-bottom:16px"><span style="font-size:2.6rem;font-weight:900;line-height:1">30 dias</span><span style="opacity:.8;font-size:.9rem">grátis, depois você decide</span></div>'+
+    '<div style="display:grid;grid-template-columns:1fr 1fr;gap:4px 18px">'+freeFeats+'</div>'+
+  '</div>'
+  // Planos pagos (após o teste) — apenas informativos
+  var paid = [
+    {name:'Profissional',price:197,features:['Destaque na busca','Relatório mensal']},
+    {name:'Premium',price:297,features:['Topo dos resultados','Badge premium']},
+  ].map(function(p){
+    var feats = p.features.map(function(f){ return '<div style="font-size:.78rem;color:var(--z500);display:flex;align-items:center;gap:6px;margin-bottom:5px"><span style="color:var(--z400);font-weight:900;font-size:.72rem">○</span>'+f+'</div>' }).join('')
+    return '<div style="border:1px solid var(--z200);border-radius:var(--rl);padding:18px;opacity:.85"><div style="font-size:.7rem;font-weight:800;color:var(--z400);text-transform:uppercase;letter-spacing:.06em;margin-bottom:6px">Após o teste (opcional)</div><div class="plan-plat-name">'+p.name+'</div><div style="font-size:1.3rem;font-weight:900;color:var(--z800)">R$ '+p.price+'<span style="font-size:.8rem;font-weight:500;color:var(--z500)">/mês</span></div><div style="margin-top:10px">'+feats+'</div></div>'
   }).join('')
+  return free + paid
 }
 
 function perfil_sobre(t){
