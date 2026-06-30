@@ -2076,6 +2076,7 @@ function renderCadastro(){
         <div class="input-group"><label class="input-label">Confirmar senha</label><div class="pass-wrap"><input class="input" type="password" placeholder="Repita a senha" value="${S.cadastro.senha2||''}" oninput="S.cadastro.senha2=this.value" /><button type="button" class="pass-eye" onclick="togglePass(this)" aria-label="Ver senha">👁</button></div></div>
       </div>
       <div id="cad-err-1" style="color:#E63946;font-size:.82rem;font-weight:600;margin-top:6px"></div>
+      <p style="text-align:center;margin-top:16px;padding-top:16px;border-top:1px solid var(--z100);font-size:.86rem;color:var(--z600)">Já tem cadastro? <a onclick="openLogin()" style="color:var(--orange);font-weight:700;cursor:pointer">Entrar na minha conta</a></p>
     </div>`:''}
     ${step===2?`
     <div class="bcard">
