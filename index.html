@@ -832,6 +832,7 @@ function mapTrainer(row, i){
     completedSessions: row.completed_sessions || 0,
     neighborhood: row.neighborhood || '',
     city: row.city || 'São Paulo',
+    whatsapp: row.whatsapp || '',
   }
 }
 
@@ -1872,6 +1873,14 @@ function renderReservar(){
 </div>`
 }
 
+function waLink(t, plan, gym){
+  var num = (t.whatsapp||'5511971826036').replace(/\D/g,'')
+  var data = S.booking.date ? new Date(S.booking.date+'T00:00:00').toLocaleDateString('pt-BR') : ''
+  var msg = 'Olá '+t.name+'! Te encontrei no Personal Prime e agendei uma aula: '
+    + (plan?plan.name:'') + (gym?' na '+gym.name:'') + (data?' dia '+data+' às '+(S.booking.time||''):'')
+    + '. Podemos confirmar?'
+  return 'https://wa.me/'+num+'?text='+encodeURIComponent(msg)
+}
 function renderConfirmacao(){
   const t = TRAINERS.find(x=>x.id===S.booking.trainerId) || TRAINERS[0]
   const plan = PLANS.find(p=>p.id===S.booking.plan)
@@ -1880,7 +1889,7 @@ function renderConfirmacao(){
 <div class="confirm-wrap">
   <div class="confirm-icon">✓</div>
   <h2 style="margin-bottom:8px">Agendamento confirmado!</h2>
-  <p>${t.name} foi notificado e vai combinar com você os detalhes e a forma de pagamento. Você também recebe tudo no seu painel.</p>
+  <p>Agora é só falar com ${t.name} no WhatsApp para confirmar a aula e combinar o pagamento. Já deixamos a mensagem pronta pra você.</p>
   <div class="confirm-card">
     <div class="confirm-row"><span style="color:var(--z500)">Personal</span><strong>${t.name}</strong></div>
     <div class="confirm-row"><span style="color:var(--z500)">Academia</span><strong>${gym?.name||'-'}</strong></div>
@@ -1888,9 +1897,12 @@ function renderConfirmacao(){
     <div class="confirm-row"><span style="color:var(--z500)">Data e hora</span><strong>${new Date(S.booking.date+'T00:00:00').toLocaleDateString('pt-BR')} às ${S.booking.time}</strong></div>
     <div class="confirm-row"><span>Valor combinado</span><strong style="color:var(--orange)">${plan?fc(planPrice(t,plan)):'-'}</strong></div>
   </div>
+  <a href="${waLink(t,plan,gym)}" target="_blank" rel="noopener" class="btn btn-lg glow-pulse" style="display:flex;width:100%;max-width:420px;margin:0 auto 12px;background:#25D366;color:#fff;border:none;font-weight:800;gap:8px">
+    <span style="font-size:1.1rem">📱</span> Falar no WhatsApp com ${t.name.split(' ')[0]}
+  </a>
   <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
-    <button class="btn btn-primary btn-lg" onclick="go('painel')">Ver minha conta</button>
-    <button class="btn btn-outline btn-lg" onclick="go('buscar')">Buscar outro personal</button>
+    <button class="btn btn-outline btn-lg" onclick="go('painel')">Ver minha conta</button>
+    <button class="btn btn-ghost btn-lg" onclick="go('buscar')">Buscar outro personal</button>
   </div>
 </div>`
 }
@@ -2078,7 +2090,7 @@ async function loadPanel(){
       if(t.data){ const bk = await sb.from('bookings').select('*').eq('trainer_id',t.data.id).order('session_date',{ascending:true}); bookings = bk.data||[] }
       PANEL.d = { trainer:t.data, bookings }
     } else {
-      const bk = await sb.from('bookings').select('*, trainers(name,avatar_url,neighborhood)').eq('student_id',USER.id).order('session_date',{ascending:false})
+      const bk = await sb.from('bookings').select('*, trainers(name,avatar_url,neighborhood,whatsapp)').eq('student_id',USER.id).order('session_date',{ascending:false})
       PANEL.d = { bookings: bk.data||[] }
     }
     PANEL.loaded = true
@@ -2123,7 +2135,9 @@ function renderPainelAluno(first){
   const rows = bks.length ? bks.map(b=>{
     const tn = b.trainers?.name || 'Personal'
     const av = b.trainers?.avatar_url || 'https://randomuser.me/api/portraits/lego/1.jpg'
-    return '<div class="session-item"><div style="display:flex;align-items:center;gap:12px"><img src="'+av+'" style="width:42px;height:42px;border-radius:50%;object-fit:cover" /><div class="sess-left"><div class="sess-name">'+tn+'</div><div class="sess-meta">'+b.plan+' · '+fmtDate(b.session_date)+' às '+b.session_time+'</div></div></div>'+statusPill(b.status)+'</div>'
+    const wa = (b.trainers?.whatsapp||'').replace(/\D/g,'')
+    const waBtn = wa ? '<a href="https://wa.me/'+wa+'?text='+encodeURIComponent('Olá '+tn+'! Sobre nossa aula agendada pelo Personal Prime ('+b.plan+' · '+fmtDate(b.session_date)+' às '+b.session_time+')')+'" target="_blank" rel="noopener" title="Falar no WhatsApp" style="display:inline-flex;align-items:center;justify-content:center;width:38px;height:38px;border-radius:10px;background:#25D366;color:#fff;font-size:1rem;flex-shrink:0;text-decoration:none">📱</a>' : ''
+    return '<div class="session-item"><div style="display:flex;align-items:center;gap:12px"><img src="'+av+'" style="width:42px;height:42px;border-radius:50%;object-fit:cover" /><div class="sess-left"><div class="sess-name">'+tn+'</div><div class="sess-meta">'+b.plan+' · '+fmtDate(b.session_date)+' às '+b.session_time+'</div></div></div><div style="display:flex;align-items:center;gap:10px">'+statusPill(b.status)+waBtn+'</div></div>'
   }).join('') : '<div style="text-align:center;padding:40px 0;color:var(--z500)"><div style="font-size:2rem;margin-bottom:8px">🗓️</div><p style="margin-bottom:16px">Você ainda não tem agendamentos.</p><button class="btn btn-primary" onclick="go(\'buscar\')">Encontrar um personal →</button></div>'
   return painelHeader('Olá, '+first,'Meu painel',
     '<button class="btn btn-primary" onclick="go(\'buscar\')">Buscar personal</button><button class="btn btn-ghost" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.2)" onclick="logout()">Sair</button>') +
