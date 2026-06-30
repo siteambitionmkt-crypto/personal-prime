@@ -1213,6 +1213,12 @@ function authNotice(msg){
 function avancarCadastro(){
   const c = S.cadastro
   const step = c.step
+  // Modo edição: o botão salva direto (de qualquer passo), sem forçar o fluxo todo
+  if(c.editing){
+    if(step===2 && (!c.specs || !c.specs.length)){ toast('Selecione pelo menos uma especialidade.','err'); return }
+    criarPerfilPersonal()
+    return
+  }
   if(step===1){
     const err = document.getElementById('cad-err-1')
     if(!c.nome || !c.nome.trim()){ if(err) err.textContent='Informe seu nome completo.'; return }
@@ -1232,8 +1238,45 @@ function avancarCadastro(){
   render()
 }
 
+// Edição de perfil — pré-preenche e pula direto pro passo que falta (não começa do zero)
+function editarPerfil(step){
+  const t = PANEL.d && PANEL.d.trainer
+  if(!t){ go('cadastro'); return }
+  S.cadastro = {
+    step: step||2, editing:true, trainerId:t.id,
+    nome: t.name||'', telefone: t.whatsapp||'', bio: t.bio||'', cref: t.cref||'',
+    specs: (t.specialties||[]).slice(), preco: t.price_per_hour||'',
+    academias: (t.academies||[]).slice(), acadQ:'',
+    gyms:[], plan:FREE_PLAN, radius:10, crefVerified:!!t.cref,
+    email:'', senha:'', senha2:''
+  }
+  go('cadastro')
+}
+async function salvarEdicaoPerfil(){
+  const c = S.cadastro
+  const btn = document.getElementById('cad-next-btn')
+  if(btn){ btn.disabled = true; btn.textContent = 'Salvando...' }
+  try{
+    const patch = {
+      name: (c.nome||'').trim() || 'Personal',
+      bio: c.bio||'', cref: c.cref||'',
+      specialties: c.specs||[],
+      price_per_hour: c.preco ? Number(c.preco) : null,
+      whatsapp: c.telefone||'',
+      academies: (c.academias||[]).map(a=>({ name:a.name, address:a.address||'', rating:a.rating||null, reviews:a.reviews||0, phone:a.phone||'' }))
+    }
+    if(c.acadQ && cleanCity(c.acadQ)) patch.city = cleanCity(c.acadQ).replace(/\b\w/g, m=>m.toUpperCase())
+    await sb.from('trainers').update(patch).eq('id', c.trainerId)
+    toast('Perfil atualizado! ✨','ok')
+    S.cadastro = { step:1, specs:[], gyms:[], academias:[], plan:FREE_PLAN, radius:10, crefVerified:false }
+    PANEL.loaded = false
+    go('painel')
+  }catch(err){ if(btn){ btn.disabled=false; btn.textContent='Salvar alterações ✓' } toast('Erro ao salvar: '+err.message,'err') }
+}
+
 async function criarPerfilPersonal(){
   const c = S.cadastro
+  if(c.editing){ return salvarEdicaoPerfil() }
   const btn = document.getElementById('cad-next-btn')
   if(btn){ btn.disabled = true; btn.textContent = 'Criando seu perfil...' }
   try{
@@ -2071,11 +2114,11 @@ function renderCadastro(){
   <div class="cad-wrap">
     <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap">
       <div onclick="go('landing')" style="display:flex;align-items:center;gap:8px;cursor:pointer"><div class="logo-icon" style="width:30px;height:30px;font-size:.9rem">P</div><span style="font-weight:800;font-size:.95rem">Personal<span style="color:var(--orange)">Prime</span></span></div>
-      <button type="button" class="btn btn-outline btn-sm" onclick="openLogin()" style="white-space:nowrap">Já tenho conta · Entrar</button>
+      ${S.cadastro.editing?`<button type="button" class="btn btn-outline btn-sm" onclick="go('painel')" style="white-space:nowrap">← Voltar ao painel</button>`:`<button type="button" class="btn btn-outline btn-sm" onclick="openLogin()" style="white-space:nowrap">Já tenho conta · Entrar</button>`}
     </div>
-    <div class="cad-prog-bar"><div class="cad-prog-fill" style="width:${pct}%"></div></div>
+    ${S.cadastro.editing?`<div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:18px">${[{n:2,l:'Qualificação'},{n:3,l:'Academias'},{n:4,l:'Preço & fotos'}].map(x=>`<button onclick="S.cadastro.step=${x.n};render()" style="padding:8px 14px;border-radius:9999px;border:1.5px solid ${step===x.n?'var(--orange)':'var(--z200)'};background:${step===x.n?'var(--orange)':'#fff'};color:${step===x.n?'#fff':'var(--z700)'};font-family:Outfit,sans-serif;font-weight:700;font-size:.82rem;cursor:pointer">${x.l}</button>`).join('')}</div>`:`<div class="cad-prog-bar"><div class="cad-prog-fill" style="width:${pct}%"></div></div>`}
     <div class="cad-step-info">
-      <div class="cad-step-num">Passo ${step} de 5</div>
+      <div class="cad-step-num">${S.cadastro.editing?'Editar perfil':'Passo '+step+' de 5'}</div>
       <div class="cad-step-title">${['','Dados pessoais','Qualificação profissional','Academias onde atende','Precificação e fotos','Plano na plataforma'][step]}</div>
       <div class="cad-step-sub">${['','Suas informações básicas para criar o perfil','Conte sobre sua formação e experiência','Onde você vai atender seus alunos','Defina seus preços e adicione fotos de perfil','Escolha como você quer aparecer na plataforma'][step]}</div>
     </div>
@@ -2205,8 +2248,10 @@ function renderCadastro(){
       </div>
     </div>`:''}
     <div style="display:flex;justify-content:space-between;gap:12px;margin-top:8px">
-      <button class="btn btn-outline" onclick="${step===1?'go(\'landing\')':'S.cadastro.step='+(step-1)+';render()'}">${step===1?'Cancelar':'← Voltar'}</button>
-      <button class="btn btn-primary btn-lg" id="cad-next-btn" onclick="avancarCadastro()">${step===5?'Criar meu perfil →':'Continuar →'}</button>
+      ${S.cadastro.editing
+        ? `<button class="btn btn-outline" onclick="go('painel')">Cancelar</button>`
+        : `<button class="btn btn-outline" onclick="${step===1?'go(\'landing\')':'S.cadastro.step='+(step-1)+';render()'}">${step===1?'Cancelar':'← Voltar'}</button>`}
+      <button class="btn btn-primary btn-lg" id="cad-next-btn" onclick="avancarCadastro()">${S.cadastro.editing?'Salvar alterações ✓':(step===5?'Criar meu perfil →':'Continuar →')}</button>
     </div>
   </div>
 </div>`
@@ -2413,17 +2458,18 @@ function renderPainelTrainer(first){
   const scColor = sc>=80?'#059669':sc>=50?'#D97706':'#E63946'
   const ativo = sc>=80
   const ring = '<div style="position:relative;width:104px;height:104px;flex-shrink:0"><svg width="104" height="104" style="transform:rotate(-90deg)"><circle cx="52" cy="52" r="46" fill="none" stroke="var(--z200)" stroke-width="9"/><circle cx="52" cy="52" r="46" fill="none" stroke="'+scColor+'" stroke-width="9" stroke-linecap="round" stroke-dasharray="'+(2*Math.PI*46).toFixed(1)+'" stroke-dashoffset="'+(2*Math.PI*46*(1-sc/100)).toFixed(1)+'"/></svg><div style="position:absolute;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center"><div style="font-size:1.5rem;font-weight:900;color:'+scColor+';line-height:1">'+sc+'%</div><div style="font-size:.6rem;color:var(--z500);font-weight:700">qualidade</div></div></div>'
-  const bars = an.dims.map(d=>{ const c=d.v>=80?'#059669':d.v>=50?'#D97706':'#E63946'; return '<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:4px"><span style="font-weight:700;color:var(--z800)">'+d.k+'</span><span style="font-weight:800;color:'+c+'">'+d.v+'%</span></div><div style="height:7px;background:var(--z200);border-radius:9999px;overflow:hidden"><div style="height:100%;width:'+d.v+'%;background:'+c+';border-radius:9999px;transition:width .6s"></div></div><div style="font-size:.72rem;color:var(--z500);margin-top:3px">'+d.tip+'</div></div>' }).join('')
+  const dimStep = { 'Descrição':2, 'Fotos':4, 'Preço':4, 'Detalhamento':2 }
+  const bars = an.dims.map(d=>{ const c=d.v>=80?'#059669':d.v>=50?'#D97706':'#E63946'; const st=dimStep[d.k]||2; const cta=d.v<100?'<span style="color:'+c+';font-weight:700"> · Corrigir →</span>':''; return '<div onclick="editarPerfil('+st+')" style="margin-bottom:12px;cursor:pointer"><div style="display:flex;justify-content:space-between;font-size:.8rem;margin-bottom:4px"><span style="font-weight:700;color:var(--z800)">'+d.k+'</span><span style="font-weight:800;color:'+c+'">'+d.v+'%</span></div><div style="height:7px;background:var(--z200);border-radius:9999px;overflow:hidden"><div style="height:100%;width:'+d.v+'%;background:'+c+';border-radius:9999px;transition:width .6s"></div></div><div style="font-size:.72rem;color:var(--z500);margin-top:3px">'+d.tip+cta+'</div></div>' }).join('')
   const gateMsg = ativo
     ? '<div style="display:inline-flex;align-items:center;gap:6px;background:#D1FAE5;color:#065F46;font-size:.74rem;font-weight:800;padding:5px 12px;border-radius:9999px">● Perfil ativo e sendo exibido nas buscas</div>'
     : '<div style="display:inline-flex;align-items:center;gap:6px;background:#FEF3C7;color:#92400E;font-size:.74rem;font-weight:800;padding:5px 12px;border-radius:9999px">⚠ Baixa visibilidade — chegue a 80% para ser destacado</div>'
-  const qualityBanner = '<div class="painel-section" style="border:2px solid '+scColor+'30"><div style="display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap"><div style="text-align:center">'+ring+'<div style="margin-top:10px">'+gateMsg+'</div></div><div style="flex:1;min-width:240px"><div style="font-size:1.05rem;font-weight:800;color:var(--z950);margin-bottom:14px">🔍 Raio-x do seu perfil</div>'+bars+(ativo?'':'<button class="btn btn-primary btn-sm" style="margin-top:6px" onclick="go(\'cadastro\')">Melhorar meu perfil →</button>')+'</div></div></div>'
+  const qualityBanner = '<div class="painel-section" style="border:2px solid '+scColor+'30"><div style="display:flex;gap:22px;align-items:flex-start;flex-wrap:wrap"><div style="text-align:center">'+ring+'<div style="margin-top:10px">'+gateMsg+'</div></div><div style="flex:1;min-width:240px"><div style="font-size:1.05rem;font-weight:800;color:var(--z950);margin-bottom:14px">🔍 Raio-x do seu perfil</div>'+bars+(ativo?'':'<button class="btn btn-primary btn-sm" style="margin-top:6px" onclick="editarPerfil(2)">Melhorar meu perfil →</button>')+'</div></div></div>'
   const nextLvl = lvl.nxt ? '<div style="font-size:.78rem;color:var(--z500);margin-top:6px">Faltam <strong>'+(lvl.nxt.min-(t.completed_sessions||0))+'</strong> sessões para o nível <strong style="color:'+lvl.nxt.c+'">'+lvl.nxt.n+'</strong></div>' : '<div style="font-size:.78rem;color:var(--z500);margin-top:6px">Nível máximo atingido. Lenda! 🏆</div>'
   const growthCard = '<div class="painel-section"><div class="painel-section-title">📈 Sua evolução</div><div style="display:grid;grid-template-columns:1fr 1fr;gap:14px;margin-bottom:16px"><div style="background:linear-gradient(135deg,#0B0C0F,#1a0a0e);border-radius:var(--rl);padding:18px;color:#fff"><div style="font-size:.72rem;opacity:.7;text-transform:uppercase;letter-spacing:.06em;font-weight:700">Gerado via Personal Prime</div><div style="font-size:1.8rem;font-weight:900;margin-top:4px">'+fc(earned)+'</div></div><div style="background:linear-gradient(135deg,'+lvl.cur.c+',#0B0C0F);border-radius:var(--rl);padding:18px;color:#fff"><div style="font-size:.72rem;opacity:.85;text-transform:uppercase;letter-spacing:.06em;font-weight:700">Nível atual</div><div style="font-size:1.5rem;font-weight:900;margin-top:4px">'+lvl.cur.n+'</div></div></div>'+nextLvl+'<div style="margin-top:14px;padding:14px 16px;background:#FFF7ED;border:1px solid #FED7AA;border-radius:var(--rl)"><p style="font-size:.85rem;color:#9A3412;margin:0">💡 Perfis <strong>100% completos</strong> e nível Ouro+ recebem até <strong>3x mais solicitações</strong>. Complete seu cadastro e suba de nível!</p></div></div>'
   const sessRows = (prox.length?prox:bks).slice(0,6).map(b=>'<div style="border-bottom:1px solid var(--z100);padding:14px 0"><div style="display:flex;align-items:center;justify-content:space-between"><div class="sess-left"><div class="sess-name">'+b.plan+'</div><div class="sess-meta">'+fmtDate(b.session_date)+' às '+b.session_time+'</div></div>'+statusPill(b.status)+'</div>'+(b.status==='confirmed'||b.status==='completed'?hireBlock(b,'trainer'):'')+'</div>').join('') || '<p style="color:var(--z500);padding:16px 0">Nenhuma sessão agendada ainda.</p>'
   const pendRows = pend.length ? pend.map(b=>'<div class="lead-item"><div class="lead-info"><div class="lead-name">'+b.plan+'</div><div class="lead-meta">'+fmtDate(b.session_date)+' · '+b.session_time+'</div></div><div class="lead-actions"><button class="btn btn-primary btn-sm" onclick="updateBooking(\''+b.id+'\',\'confirmed\')">Aceitar</button><button class="btn btn-ghost btn-sm" onclick="updateBooking(\''+b.id+'\',\'cancelled\')">Recusar</button></div></div>').join('') : '<p style="color:var(--z500);padding:12px 0;font-size:.88rem">Nenhuma solicitação nova.</p>'
   return painelHeader('Olá, '+first,'Painel do Personal',
-    '<button class="btn btn-primary" onclick="go(\'cadastro\')">Editar perfil</button><button class="btn btn-ghost" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.2)" onclick="logout()">Sair</button>') +
+    '<button class="btn btn-primary" onclick="editarPerfil(2)">Editar perfil</button><button class="btn btn-ghost" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.2)" onclick="logout()">Sair</button>') +
   '<div class="container" style="padding:28px 0 48px">'+qualityBanner+
   '<div class="painel-stats" style="margin:24px 0">'+
     statCard('📨', bks.length, 'Solicitações')+
