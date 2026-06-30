@@ -678,10 +678,8 @@ html.lenis,html.lenis body{height:auto}
   .aurora,.glow-pulse,.btn-primary::after{animation:none!important}
 }
 </style>
-<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
-<script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
-<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
+<link rel="preconnect" href="https://cdn.jsdelivr.net">
+<link rel="preconnect" href="https://xyshougnfciyuthyojvm.supabase.co">
 </head>
 <body>
 <div id="grain"></div>
@@ -840,6 +838,11 @@ html.lenis,html.lenis body{height:auto}
   </div>
 </div>
 
+<!-- Bibliotecas no fim do body: a tela pinta antes (perf mobile) -->
+<script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+<script src="https://cdn.jsdelivr.net/npm/@studio-freight/lenis@1.0.42/dist/lenis.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/gsap.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/gsap@3.12.5/dist/ScrollTrigger.min.js"></script>
 <script>
 // ─── SUPABASE ────────────────────────────────────────────────────────────────
 const SUPA_URL = 'https://xyshougnfciyuthyojvm.supabase.co'
@@ -2236,9 +2239,12 @@ async function loadPanel(){
   PANEL.role = role
   try{
     if(role==='admin'){
-      const st = await sb.rpc('admin_stats')
-      const allT = await sb.from('trainers').select('*').order('created_at',{ascending:false})
-      PANEL.d = { stats: st.data||{}, allTrainers: allT.data||[] }
+      const [st, ch, allT] = await Promise.all([
+        sb.rpc('admin_stats'),
+        sb.rpc('admin_charts'),
+        sb.from('trainers').select('*').order('created_at',{ascending:false})
+      ])
+      PANEL.d = { stats: st.data||{}, charts: ch.data||{}, allTrainers: allT.data||[] }
     } else if(role==='trainer'){
       const t = await sb.from('trainers').select('*').eq('profile_id',USER.id).maybeSingle()
       let bookings = []
@@ -2252,7 +2258,7 @@ async function loadPanel(){
     PANEL.loaded = true
   }catch(err){ PANEL.error = err.message; PANEL.loaded = true }
   PANEL.loading = false
-  if(S.screen==='painel') render()
+  if(S.screen==='painel'){ render(); if(PANEL.role==='admin') requestAnimationFrame(initAdminCharts) }
 }
 
 function fmtDate(d){ try{ return new Date(d+'T00:00:00').toLocaleDateString('pt-BR') }catch(e){ return d } }
@@ -2428,44 +2434,79 @@ function renderPainelTrainer(first){
   '<div class="painel-grid"><div><div class="painel-section"><div class="painel-section-title">🔥 Solicitações novas '+(pend.length?'<span class="badge badge-orange" style="font-size:.65rem">'+pend.length+' nova(s)</span>':'')+'</div>'+pendRows+'</div><div class="painel-section"><div class="painel-section-title">📅 Próximas sessões</div>'+sessRows+'</div></div><div><div class="painel-section"><div class="painel-section-title">📦 Meu plano</div><div style="background:linear-gradient(135deg,#10B981,#059669);border-radius:var(--rl);padding:18px;color:#fff;margin-bottom:14px"><div style="font-size:.72rem;font-weight:800;opacity:.85;letter-spacing:.08em;text-transform:uppercase;margin-bottom:4px">Plano atual</div><div style="font-size:1.3rem;font-weight:900">Lançamento · Grátis</div><div style="font-size:.76rem;opacity:.85;margin-top:4px">Sem mensalidade durante o lançamento</div></div><p style="font-size:.78rem;color:var(--z500);line-height:1.6">No futuro, planos pagos darão ainda mais visibilidade e destaque. Por enquanto, aproveite tudo gratuitamente.</p></div></div></div></div>'
 }
 
+function ensureChartJs(){
+  return new Promise(function(resolve){
+    if(window.Chart) return resolve(true)
+    var s=document.createElement('script')
+    s.src='https://cdn.jsdelivr.net/npm/chart.js@4.4.1/dist/chart.umd.min.js'
+    s.onload=function(){ resolve(true) }; s.onerror=function(){ resolve(false) }
+    document.head.appendChild(s)
+  })
+}
+let ADMIN_CHARTS=[]
+async function initAdminCharts(){
+  const c = (PANEL.d&&PANEL.d.charts)||{}
+  const ok = await ensureChartJs()
+  if(!ok || !window.Chart) return
+  ADMIN_CHARTS.forEach(function(x){ try{x.destroy()}catch(e){} }); ADMIN_CHARTS=[]
+  Chart.defaults.font.family='Outfit, sans-serif'
+  Chart.defaults.color='rgba(255,255,255,.5)'
+  function mk(id, labels, data, color){
+    const el=document.getElementById(id); if(!el) return
+    const ctx=el.getContext('2d')
+    const grad=ctx.createLinearGradient(0,0,0,160); grad.addColorStop(0,color+'66'); grad.addColorStop(1,color+'05')
+    ADMIN_CHARTS.push(new Chart(ctx,{type:'line',data:{labels:labels,datasets:[{data:data,borderColor:color,backgroundColor:grad,fill:true,tension:.4,borderWidth:2.5,pointRadius:0,pointHoverRadius:5,pointHoverBackgroundColor:color}]},options:{responsive:true,maintainAspectRatio:false,plugins:{legend:{display:false},tooltip:{backgroundColor:'#16181E',borderColor:'rgba(255,255,255,.1)',borderWidth:1,padding:10,displayColors:false}},scales:{x:{grid:{display:false},ticks:{maxTicksLimit:7,font:{size:10}}},y:{beginAtZero:true,grid:{color:'rgba(255,255,255,.06)'},ticks:{precision:0,font:{size:10},maxTicksLimit:4}}}}}))
+  }
+  const vbd=c.views_by_day||[], bbd=c.bookings_by_day||[]
+  mk('chart-views', vbd.map(x=>x.label), vbd.map(x=>x.value), '#E63946')
+  mk('chart-books', bbd.map(x=>x.label), bbd.map(x=>x.value), '#10B981')
+}
+
+function funnelBar(label, value, max, color){
+  const pct = max>0 ? Math.max(4, Math.round(value/max*100)) : 4
+  return '<div style="margin-bottom:12px"><div style="display:flex;justify-content:space-between;font-size:.82rem;margin-bottom:5px"><span style="font-weight:600;color:var(--z700)">'+label+'</span><strong style="color:'+color+'">'+value+'</strong></div><div style="height:12px;background:var(--z100);border-radius:9999px;overflow:hidden"><div style="height:100%;width:'+pct+'%;background:'+color+';border-radius:9999px;transition:width .8s cubic-bezier(.16,.84,.44,1)"></div></div></div>'
+}
+
 function renderPainelAdmin(first){
   const s = PANEL.d.stats||{}
+  const c = PANEL.d.charts||{}
+  const f = c.funnel||{}
   const all = PANEL.d.allTrainers||[]
   const convRate = s.bookings ? Math.round((s.conversions/s.bookings)*100) : 0
-  // Cadastros incompletos: score <80 ou não verificado
   const incompletos = all.map(t=>({t, sc:analyzeTrainer(t).overall})).filter(x=>x.sc<80 || !x.t.verified)
-  const recent = all.slice(0,6).map(t=>{ const sc=analyzeTrainer(t).overall; const c=sc>=80?'#059669':sc>=50?'#D97706':'#E63946'; return '<div class="session-item"><div class="sess-left"><div class="sess-name">'+t.name+(t.verified?' <span style="color:var(--green);font-size:.7rem">✓</span>':'')+'</div><div class="sess-meta">'+(t.city||'')+' · R$'+(t.price_per_hour||0)+'/h · ⭐'+(t.rating||0)+'</div></div><span style="font-size:.78rem;font-weight:800;color:'+c+'">'+sc+'%</span></div>' }).join('') || '<p style="color:var(--z500)">Nenhum personal ainda.</p>'
-  const incRows = incompletos.length ? incompletos.slice(0,12).map(x=>{
-    const t=x.t; const wa=(t.whatsapp||'').replace(/\D/g,'')
-    const remind = wa ? '<a href="https://wa.me/'+wa+'?text='+encodeURIComponent('Olá '+t.name+'! Seu perfil no Personal Prime está '+x.sc+'% completo. Complete para ser exibido aos alunos e receber mais contatos: www.personalprime.com.br')+'" target="_blank" rel="noopener" class="btn btn-sm" style="background:#25D366;color:#fff">Lembrar 📱</a>' : '<span style="font-size:.72rem;color:var(--z400)">sem WhatsApp</span>'
-    return '<div class="lead-item"><div class="lead-info"><div class="lead-name">'+t.name+' <span style="font-size:.72rem;font-weight:800;color:#E63946">'+x.sc+'%</span></div><div class="lead-meta">'+(!t.verified?'CREF não verificado · ':'')+(t.city||'')+'</div></div><div class="lead-actions">'+remind+'</div></div>'
-  }).join('') : '<p style="color:var(--z500);padding:12px 0">Todos os cadastros estão completos! 🎉</p>'
+  const fMax = Math.max(f.acessos||0, f.cadastros||0, f.agendamentos||0, f.contratacoes||0, 1)
+  const funnel = funnelBar('👀 Acessos ao site', f.acessos||0, fMax, '#3B82F6') +
+    funnelBar('📝 Cadastros', f.cadastros||0, fMax, '#8B5CF6') +
+    funnelBar('🗓️ Agendamentos', f.agendamentos||0, fMax, '#F59E0B') +
+    funnelBar('🏆 Contratações confirmadas', f.contratacoes||0, fMax, '#10B981')
+  const recent = all.slice(0,6).map(t=>{ const sc=analyzeTrainer(t).overall; const cc=sc>=80?'#059669':sc>=50?'#D97706':'#E63946'; return '<div class="session-item"><div class="sess-left"><div class="sess-name">'+t.name+(t.verified?' <span style="color:var(--green);font-size:.7rem">✓</span>':'')+'</div><div class="sess-meta">'+(t.city||'')+' · R$'+(t.price_per_hour||0)+'/h</div></div><span style="font-size:.78rem;font-weight:800;color:'+cc+'">'+sc+'%</span></div>' }).join('') || '<p style="color:var(--z500)">Nenhum personal ainda.</p>'
+  const incRows = incompletos.length ? incompletos.slice(0,10).map(x=>{ const t=x.t; const wa=(t.whatsapp||'').replace(/\D/g,''); const remind = wa ? '<a href="https://wa.me/'+wa+'?text='+encodeURIComponent('Olá '+t.name+'! Seu perfil no Personal Prime está '+x.sc+'% completo. Complete para ser exibido e receber mais alunos: www.personalprime.com.br')+'" target="_blank" rel="noopener" class="btn btn-sm" style="background:#25D366;color:#fff">Lembrar 📱</a>' : '<span style="font-size:.72rem;color:var(--z400)">sem WhatsApp</span>'; return '<div class="lead-item"><div class="lead-info"><div class="lead-name">'+t.name+' <span style="font-size:.72rem;font-weight:800;color:#E63946">'+x.sc+'%</span></div><div class="lead-meta">'+(!t.verified?'CREF não verificado · ':'')+(t.city||'')+'</div></div><div class="lead-actions">'+remind+'</div></div>' }).join('') : '<p style="color:var(--z500);padding:12px 0">Todos os cadastros completos! 🎉</p>'
   return painelHeader('Painel Gerencial','Personal Prime · Master',
     '<button class="btn btn-primary" onclick="go(\'buscar\')">Ver site</button><button class="btn btn-ghost" style="color:rgba(255,255,255,.7);border-color:rgba(255,255,255,.2)" onclick="logout()">Sair</button>') +
   '<div class="container" style="padding:28px 0 48px">'+
-  // Bloco de impacto (acessos + conversão)
+  // KPIs hero
   '<div style="display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px">'+
-    '<div style="background:linear-gradient(135deg,#0B0C0F,#1a0a0e);border-radius:var(--rxl);padding:24px;color:#fff;position:relative;overflow:hidden"><div class="aurora" style="top:-30%;right:-10%;width:240px;height:240px;background:radial-gradient(circle,rgba(230,57,70,.25),transparent 65%)"></div><div style="position:relative"><div style="font-size:.72rem;font-weight:800;opacity:.7;text-transform:uppercase;letter-spacing:.06em">Acessos à plataforma</div><div style="font-size:2.6rem;font-weight:900;line-height:1.1">'+(s.views_total||0)+'</div><div style="font-size:.82rem;opacity:.65">'+(s.views_7d||0)+' nos últimos 7 dias</div></div></div>'+
-    '<div style="background:linear-gradient(135deg,#E63946,#C1121F);border-radius:var(--rxl);padding:24px;color:#fff"><div style="font-size:.72rem;font-weight:800;opacity:.85;text-transform:uppercase;letter-spacing:.06em">Contratações confirmadas</div><div style="font-size:2.6rem;font-weight:900;line-height:1.1">'+(s.conversions||0)+'</div><div style="font-size:.82rem;opacity:.85">'+convRate+'% de conversão · '+(s.bookings||0)+' agendamentos</div></div>'+
+    '<div style="background:linear-gradient(135deg,#0B0C0F,#1a0a0e);border-radius:var(--rxl);padding:24px;color:#fff;position:relative;overflow:hidden"><div class="aurora" style="top:-30%;right:-10%;width:240px;height:240px;background:radial-gradient(circle,rgba(59,130,246,.25),transparent 65%)"></div><div style="position:relative"><div style="font-size:.72rem;font-weight:800;opacity:.7;text-transform:uppercase;letter-spacing:.06em">Acessos à plataforma</div><div style="font-size:2.6rem;font-weight:900;line-height:1.1">'+(s.views_total||0)+'</div><div style="font-size:.82rem;opacity:.65">'+(s.views_7d||0)+' nos últimos 7 dias</div></div></div>'+
+    '<div style="background:linear-gradient(135deg,#10B981,#047857);border-radius:var(--rxl);padding:24px;color:#fff"><div style="font-size:.72rem;font-weight:800;opacity:.85;text-transform:uppercase;letter-spacing:.06em">Taxa de conversão</div><div style="font-size:2.6rem;font-weight:900;line-height:1.1">'+convRate+'%</div><div style="font-size:.82rem;opacity:.85">'+(s.conversions||0)+' contratações · '+(s.bookings||0)+' agendamentos</div></div>'+
   '</div>'+
-  // Stats gerais
-  '<div class="painel-stats" style="margin-bottom:14px">'+
+  // Gráficos
+  '<div class="painel-grid" style="grid-template-columns:1fr 1fr">'+
+    '<div class="painel-section" style="background:var(--ink);border:1px solid var(--hair)"><div class="painel-section-title" style="color:#fff">📈 Acessos · 14 dias</div><div style="height:170px"><canvas id="chart-views"></canvas></div></div>'+
+    '<div class="painel-section" style="background:var(--ink);border:1px solid var(--hair)"><div class="painel-section-title" style="color:#fff">🗓️ Agendamentos · 14 dias</div><div style="height:170px"><canvas id="chart-books"></canvas></div></div>'+
+  '</div>'+
+  // Funil
+  '<div class="painel-section"><div class="painel-section-title">🔻 Funil de conversão</div><p style="font-size:.8rem;color:var(--z500);margin-bottom:16px">Do acesso à contratação confirmada. É aqui que você vê o Personal Prime mudando o jogo.</p>'+funnel+'</div>'+
+  // Stats
+  '<div class="painel-stats" style="margin-bottom:20px">'+
     statCard('🧍', s.students||0, 'Alunos')+
     statCard('💪', s.trainers_active||0, 'Personais ativos')+
     statCard('🏢', s.gyms||0, 'Academias')+
-    statCard('🗓️', s.pending_bookings||0, 'Solicitações pendentes')+
-  '</div>'+
-  '<div class="painel-stats" style="margin-bottom:24px">'+
-    statCard('📋', s.trainers_total||0, 'Cadastros de personal')+
-    statCard('⚠️', s.trainers_unverified||0, 'CREF não verificado')+
-    statCard('🚧', incompletos.length, 'Cadastros incompletos')+
-    statCard('👀', s.views_7d||0, 'Acessos 7 dias')+
+    statCard('⏳', (c.pend_confirm||0), 'Confirmações pendentes')+
   '</div>'+
   '<div class="painel-grid">'+
-    '<div class="painel-section"><div class="painel-section-title">🚧 Cadastros incompletos <span class="badge badge-orange" style="font-size:.65rem">'+incompletos.length+'</span></div><p style="font-size:.8rem;color:var(--z500);margin-bottom:10px">Personais abaixo de 80% não são destacados. Envie um lembrete para completarem.</p>'+incRows+'</div>'+
+    '<div class="painel-section"><div class="painel-section-title">🚧 Cadastros incompletos <span class="badge badge-orange" style="font-size:.65rem">'+incompletos.length+'</span></div><p style="font-size:.8rem;color:var(--z500);margin-bottom:10px">Abaixo de 80% não são destacados. Envie um lembrete.</p>'+incRows+'</div>'+
     '<div class="painel-section"><div class="painel-section-title">🆕 Personais recentes</div>'+recent+'</div>'+
   '</div>'+
-  '<div style="margin-top:16px;padding:16px 18px;background:#EFF6FF;border:1px solid #BFDBFE;border-radius:var(--rl)"><p style="font-size:.85rem;color:#1E40AF;margin:0">💡 <strong>Próximo nível:</strong> os lembretes automáticos (WhatsApp/e-mail para quem não concluiu o cadastro) podem rodar sozinhos via n8n. Por enquanto, use o botão "Lembrar" para enviar manualmente.</p></div>'+
   '</div>'
 }
 
