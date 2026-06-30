@@ -868,6 +868,7 @@ function mapTrainer(row, i){
     neighborhood: row.neighborhood || '',
     city: row.city || 'São Paulo',
     whatsapp: row.whatsapp || '',
+    academies: Array.isArray(row.academies) ? row.academies : [],
   }
 }
 
@@ -1186,6 +1187,8 @@ async function finalizarReserva(){
         plan: plan?.name || b.plan,
         session_date: b.date,
         session_time: b.time,
+        gym_name: b.gym || null,
+        gym_suggestion: b.gymSuggestion || null,
         price_total: total,
         status: 'pending',
         payment_status: 'unpaid'
@@ -1913,8 +1916,11 @@ function renderReservar(){
   const t = TRAINERS.find(x=>x.id===S.booking.trainerId) || TRAINERS[0]
   const step = S.booking.step || 1
   const selectedPlan = PLANS.find(p=>p.id===S.booking.plan)
-  const selectedGym = GYMS.find(g=>g.id===S.booking.gym)
   const trainerGyms = GYMS.filter(g=>t.gyms.includes(g.id))
+  const acadOptions = (t.academies && t.academies.length)
+    ? t.academies.map(a=>({ name:a.name, addr:a.address||'', rating:a.rating||null }))
+    : trainerGyms.map(g=>({ name:g.name, addr:(g.address||'')+' · '+(g.neighborhood||''), rating:null, abbr:g.abbr }))
+  const gymLabel = S.booking.gym || (S.booking.gymSuggestion ? S.booking.gymSuggestion+' (sugestão)' : '')
   const days = ['Dom','Seg','Ter','Qua','Qui','Sex','Sáb']
   const today = new Date()
   const nextDays = Array.from({length:7},(_,i)=>{ const d=new Date(today); d.setDate(d.getDate()+i+1); return d })
@@ -1949,18 +1955,24 @@ function renderReservar(){
     }${step===2?`
     <div class="bcard">
       <div class="bcard-title">Escolha a academia</div>
-      ${trainerGyms.map(g=>`
-      <div class="gym-sel ${S.booking.gym===g.id?'on':''} ${g.isSkyfit?'skyfit-sel':''}" onclick="S.booking.gym='${g.id}';render()">
-        <div class="gym-sel-icon ${g.isSkyfit?'skyfit-ico':''}">${g.abbr}</div>
-        <div>
-          <div class="gym-sel-name">${g.name} ${g.isSkyfit?'⭐':''}</div>
-          <div class="gym-sel-addr">${g.address} · ${g.neighborhood}</div>
-        </div>
-      </div>`).join('')}
+      <p style="font-size:.84rem;color:var(--z500);margin-bottom:14px">Academias onde ${t.name.split(' ')[0]} atende:</p>
+      ${acadOptions.map(function(a){
+        var sel = S.booking.gym===a.name
+        var meta = (a.rating?'★ '+a.rating+' · ':'') + (a.addr||'')
+        return '<div class="gym-sel '+(sel?'on':'')+'" onclick="S.booking.gym=this.dataset.n;S.booking.gymSuggestion=\'\';render()" data-n="'+a.name.replace(/"/g,'&quot;')+'">'+
+          '<div class="gym-sel-icon">'+(a.abbr||'🏋')+'</div>'+
+          '<div><div class="gym-sel-name">'+a.name+'</div><div class="gym-sel-addr">'+meta+'</div></div>'+
+        '</div>'
+      }).join('') || '<p style="color:var(--z500);font-size:.85rem">Este personal ainda não cadastrou academias. Use o campo abaixo para sugerir onde você quer treinar.</p>'}
+      <div style="margin-top:18px;padding-top:16px;border-top:1px solid var(--z100)">
+        <label class="input-label">Prefere outra academia? Sugira aqui</label>
+        <input class="input" style="margin-top:8px" placeholder="Ex: Smart Fit Centro, ou o bairro que prefere" value="${S.booking.gymSuggestion||''}" oninput="S.booking.gymSuggestion=this.value" />
+        <p style="font-size:.74rem;color:var(--z500);margin-top:6px">O personal confirma com você a disponibilidade nessa academia.</p>
+      </div>
     </div>
     <div class="bnav">
       <button class="btn btn-outline" onclick="S.booking.step=1;render()">← Voltar</button>
-      <button class="btn btn-primary" onclick="if(S.booking.gym){S.booking.step=3;render()}else{toast('Selecione uma academia','err')}">Continuar →</button>
+      <button class="btn btn-primary" onclick="if(S.booking.gym||(S.booking.gymSuggestion||'').trim()){S.booking.step=3;render()}else{toast('Escolha uma academia ou sugira uma','err')}">Continuar →</button>
     </div>`:''}
 
     ${step===3?`
@@ -1993,7 +2005,7 @@ function renderReservar(){
       <div class="bsummary">
         <div class="bsum-row"><span>Personal</span><strong>${t.name}</strong></div>
         <div class="bsum-row"><span>Plano</span><strong>${selectedPlan?.name}</strong></div>
-        <div class="bsum-row"><span>Academia</span><strong>${selectedGym?.name}</strong></div>
+        <div class="bsum-row"><span>Academia</span><strong>${gymLabel||'-'}</strong></div>
         <div class="bsum-row"><span>Data e hora</span><strong>${new Date(S.booking.date+'T00:00:00').toLocaleDateString('pt-BR')} às ${S.booking.time}</strong></div>
         <div class="bsum-row"><span>Valor combinado</span><strong style="color:var(--orange)">${selectedPlan?fc(planPrice(t,selectedPlan)):'-'}</strong></div>
       </div>
@@ -2013,18 +2025,18 @@ function renderReservar(){
 </div>`
 }
 
-function waLink(t, plan, gym){
+function waLink(t, plan, gymName){
   var num = (t.whatsapp||'5511971826036').replace(/\D/g,'')
   var data = S.booking.date ? new Date(S.booking.date+'T00:00:00').toLocaleDateString('pt-BR') : ''
   var msg = 'Olá '+t.name+'! Te encontrei no Personal Prime e agendei uma aula: '
-    + (plan?plan.name:'') + (gym?' na '+gym.name:'') + (data?' dia '+data+' às '+(S.booking.time||''):'')
+    + (plan?plan.name:'') + (gymName?' na '+gymName:'') + (data?' dia '+data+' às '+(S.booking.time||''):'')
     + '. Podemos confirmar?'
   return 'https://wa.me/'+num+'?text='+encodeURIComponent(msg)
 }
 function renderConfirmacao(){
   const t = TRAINERS.find(x=>x.id===S.booking.trainerId) || TRAINERS[0]
   const plan = PLANS.find(p=>p.id===S.booking.plan)
-  const gym = GYMS.find(g=>g.id===S.booking.gym)
+  const gymName = S.booking.gym || S.booking.gymSuggestion || ''
   return `
 <div class="confirm-wrap">
   <div class="confirm-icon">✓</div>
@@ -2032,12 +2044,12 @@ function renderConfirmacao(){
   <p>Agora é só falar com ${t.name} no WhatsApp para confirmar a aula e combinar o pagamento. Já deixamos a mensagem pronta pra você.</p>
   <div class="confirm-card">
     <div class="confirm-row"><span style="color:var(--z500)">Personal</span><strong>${t.name}</strong></div>
-    <div class="confirm-row"><span style="color:var(--z500)">Academia</span><strong>${gym?.name||'-'}</strong></div>
+    <div class="confirm-row"><span style="color:var(--z500)">Academia</span><strong>${gymName||'-'}</strong></div>
     <div class="confirm-row"><span style="color:var(--z500)">Plano</span><strong>${plan?.name||'-'}</strong></div>
     <div class="confirm-row"><span style="color:var(--z500)">Data e hora</span><strong>${new Date(S.booking.date+'T00:00:00').toLocaleDateString('pt-BR')} às ${S.booking.time}</strong></div>
     <div class="confirm-row"><span>Valor combinado</span><strong style="color:var(--orange)">${plan?fc(planPrice(t,plan)):'-'}</strong></div>
   </div>
-  <a href="${waLink(t,plan,gym)}" target="_blank" rel="noopener" class="btn btn-lg glow-pulse" style="display:flex;width:100%;max-width:420px;margin:0 auto 12px;background:#25D366;color:#fff;border:none;font-weight:800;gap:8px">
+  <a href="${waLink(t,plan,gymName)}" target="_blank" rel="noopener" class="btn btn-lg glow-pulse" style="display:flex;width:100%;max-width:420px;margin:0 auto 12px;background:#25D366;color:#fff;border:none;font-weight:800;gap:8px">
     <span style="font-size:1.1rem">📱</span> Falar no WhatsApp com ${t.name.split(' ')[0]}
   </a>
   <div style="display:flex;gap:12px;justify-content:center;flex-wrap:wrap">
@@ -2054,7 +2066,10 @@ function renderCadastro(){
   return `
 <div style="background:var(--z50);min-height:calc(100vh - 68px)">
   <div class="cad-wrap">
-    <div style="display:flex;justify-content:flex-end;margin-bottom:10px"><span style="font-size:.82rem;color:var(--z600)">Já tem conta? <a onclick="openLogin()" style="color:var(--orange);font-weight:700;cursor:pointer">Entrar</a></span></div>
+    <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:14px;gap:10px;flex-wrap:wrap">
+      <div onclick="go('landing')" style="display:flex;align-items:center;gap:8px;cursor:pointer"><div class="logo-icon" style="width:30px;height:30px;font-size:.9rem">P</div><span style="font-weight:800;font-size:.95rem">Personal<span style="color:var(--orange)">Prime</span></span></div>
+      <button type="button" class="btn btn-outline btn-sm" onclick="openLogin()" style="white-space:nowrap">Já tenho conta · Entrar</button>
+    </div>
     <div class="cad-prog-bar"><div class="cad-prog-fill" style="width:${pct}%"></div></div>
     <div class="cad-step-info">
       <div class="cad-step-num">Passo ${step} de 5</div>
