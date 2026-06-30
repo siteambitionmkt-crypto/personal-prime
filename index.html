@@ -717,7 +717,7 @@ html.lenis,html.lenis body{height:auto}
       <a onclick="go('cadastro')">Para Personais</a>
     </div>
     <div class="nav-actions">
-      <button class="btn btn-ghost" id="nav-auth-btn" data-auth-label onclick="navAuthClick()">Entrar como Aluno</button>
+      <button class="btn btn-ghost" id="nav-auth-btn" data-auth-label onclick="navAuthClick()">Entrar</button>
       <div style="position:relative;display:none" id="access-wrap">
         <button class="btn btn-outline" onclick="toggleAccessMenu()">Painel ▾</button>
         <div id="access-menu" style="display:none;position:absolute;top:calc(100% + 8px);right:0;background:var(--white);border:1px solid var(--z200);border-radius:var(--rl);box-shadow:var(--sl);padding:6px;min-width:200px;z-index:200">
@@ -898,7 +898,7 @@ function updateAuthUI(){
   const btn = document.getElementById('nav-auth-btn')
   if(btn){
     const first = (PROFILE?.full_name || '').split(' ')[0]
-    btn.textContent = USER ? ('Olá, ' + (first || 'você')) : 'Entrar como Aluno'
+    btn.textContent = USER ? ('Olá, ' + (first || 'você')) : 'Entrar'
   }
   // menu de painel: visível só para admin
   const wrap = document.getElementById('access-wrap')
